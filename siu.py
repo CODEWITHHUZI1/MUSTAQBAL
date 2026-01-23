@@ -45,7 +45,7 @@ from langchain_community.vectorstores import Chroma
 @st.cache_resource
 def init_ai_models():
     # Corrected model to gemini-1.5-flash
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.2, google_api_key=API_KEY)
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2, google_api_key=API_KEY)
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=API_KEY)
     return llm, embeddings
 
@@ -147,3 +147,4 @@ if view_mode == "🏢 Chambers":
         active_data["history"].append({"role": "assistant", "content": response})
         st.session_state.mic_key += 1
         st.rerun()
+
