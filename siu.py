@@ -31,7 +31,7 @@ API_KEY = st.secrets.get("GEMINI_API_KEY")
 
 @st.cache_resource
 def init_ai():
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=API_KEY, max_output_tokens=8192)
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=API_KEY, max_output_tokens=8192)
     emb = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=API_KEY)
     return llm, emb
 
@@ -120,3 +120,4 @@ if final_q:
         case_data["history"].append({"role": "assistant", "content": ans})
         st.session_state.mic_key += 1
         st.rerun()
+
