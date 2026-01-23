@@ -1,14 +1,4 @@
-None selected
 
-Skip to content
-Using Gmail with screen readers
-Enable desktop notifications for Gmail.
-   OK  No thanks
-Conversations
-25% of 15 GB used
-Terms · Privacy · Program Policies
-Last account activity: 12 minutes ago
-Details
 import streamlit as st
 import os
 import sqlite3
@@ -390,3 +380,4 @@ else:
 
 app (1).py
 Displaying app (1).py.
+
