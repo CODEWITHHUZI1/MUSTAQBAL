@@ -1,6 +1,7 @@
 streamlit>=1.35.0
 langchain>=0.3.0
 langchain-community>=0.3.0
+streamlit-google-auth
 langchain-google-genai>=2.0.0
 langchain-chroma>=0.1.4
 langchain-text-splitters>=0.3.0
@@ -11,3 +12,4 @@ streamlit_mic_recorder>=0.0.8
 pypdf>=5.0.0
 pysqlite3-binary
 chromadb>=0.5.0
+
