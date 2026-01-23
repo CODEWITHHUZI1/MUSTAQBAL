@@ -378,6 +378,4 @@ else:
 
 
 
-app (1).py
-Displaying app (1).py.
 
