@@ -307,10 +307,11 @@ else:
         if selected_theme != st.session_state.current_theme:
             st.session_state.current_theme = selected_theme; st.rerun()
             
-    navigation_selection = st.sidebar.radio("Navigation", ["Consultation Chambers", "Digital Library", "About Alpha Apex"])
+    navigation_selection = st.sidebar.radio("Navigation", ["Consultation Chambers", "Law Library", "About Alpha Apex"])
     if navigation_selection == "Consultation Chambers": render_chambers()
     elif navigation_selection == "Digital Library": render_library()
     else: render_about()
+
 
 
 
