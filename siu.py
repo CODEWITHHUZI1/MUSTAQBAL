@@ -5,12 +5,15 @@ sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import streamlit as st
 import sqlite3
 import datetime
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 import streamlit.components.v1 as components
 from langchain_google_genai import ChatGoogleGenerativeAI
 from streamlit_mic_recorder import speech_to_text
 
 # ==============================================================================
-# 1. SETUP
+# 1. INITIALIZATION & DATABASE
 # ==============================================================================
 st.set_page_config(page_title="Alpha Apex", page_icon="⚖️", layout="wide")
 API_KEY = st.secrets["GEMINI_API_KEY"]
@@ -25,156 +28,122 @@ def init_sql_db():
     conn.commit()
     conn.close()
 
-def db_save_message(email, case_name, role, content):
-    conn = sqlite3.connect(SQL_DB_FILE)
-    c = conn.cursor()
-    c.execute("SELECT id FROM cases WHERE email=? AND case_name=?", (email, case_name))
-    res = c.fetchone()
-    if res:
-        c.execute("INSERT INTO history (case_id, role, content, timestamp) VALUES (?,?,?,?)", (res[0], role, content, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-    conn.commit()
-    conn.close()
-
-def db_load_history(email, case_name):
-    conn = sqlite3.connect(SQL_DB_FILE)
-    c = conn.cursor()
-    c.execute("SELECT role, content FROM history JOIN cases ON history.case_id = cases.id WHERE cases.email=? AND cases.case_name=? ORDER BY history.id ASC", (email, case_name))
-    data = [{"role": r, "content": t} for r, t in c.fetchall()]
-    conn.close()
-    return data
-
 init_sql_db()
 
 # ==============================================================================
-# 2. THE FIX: RELAXED SAFETY LLM
+# 2. CORE UTILITIES
 # ==============================================================================
+def send_email_report(receiver_email, case_name, history):
+    try:
+        sender_email = st.secrets["EMAIL_USER"]
+        sender_password = st.secrets["EMAIL_PASS"]
+        report_content = f"Legal Report: {case_name}\n" + "="*30 + "\n\n"
+        for m in history:
+            role = "Counsel" if m['role'] == 'assistant' else "Client"
+            report_content += f"[{role}]: {m['content']}\n\n"
+        
+        msg = MIMEMultipart(); msg['From'] = f"Alpha Apex <{sender_email}>"
+        msg['To'] = receiver_email; msg['Subject'] = f"Case Summary: {case_name}"
+        msg.attach(MIMEText(report_content, 'plain'))
+        
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls(); server.login(sender_email, sender_password)
+        server.send_message(msg); server.quit()
+        return True
+    except Exception as e:
+        st.error(f"Email Failed: {e}"); return False
+
 @st.cache_resource
 def load_llm():
-    return ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash", 
-        google_api_key=API_KEY, 
-        temperature=0.3,
-        safety_settings={
-            "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
-            "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
-            "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE",
-            "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE",
-        }
-    )
-
-ai_engine = load_llm()
+    return ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=API_KEY, temperature=0.3)
 
 def play_voice_js(text, lang_code):
+    """Fixed JS TTS injection"""
     safe_text = text.replace("'", "").replace('"', "").replace("\n", " ").strip()
     js_code = f"""
         <script>
-            window.speechSynthesis.cancel();
             var msg = new SpeechSynthesisUtterance('{safe_text}');
             msg.lang = '{lang_code}';
+            window.speechSynthesis.cancel();
             window.speechSynthesis.speak(msg);
         </script>
     """
     components.html(js_code, height=0)
 
 # ==============================================================================
-# 3. INTERFACE
+# 3. PAGE RENDERING
 # ==============================================================================
-def render_chambers_page():
-    # Focused list of local Pakistani languages
-    langs = {
-        "English": "en-US",
-        "Urdu (اردو)": "ur-PK",
-        "Sindhi (سنڌي)": "sd-PK",
-        "Punjabi (پنجابی)": "pa-PK",
-        "Pashto (پښتو)": "ps-PK",
-        "Balochi (بلوچی)": "bal-PK" # Note: Browser support for Balochi TTS varies
-    }
+
+def render_chambers():
+    langs = {"English": "en-US", "Urdu": "ur-PK", "Sindhi": "sd-PK", "Punjabi": "pa-PK", "Pashto": "ps-PK", "Balochi": "bal-PK"}
     
+    # Sidebar Nav (Restored)
     with st.sidebar:
-        st.title("👨‍⚖️ Alpha Apex")
-        target_lang = st.selectbox("🌐 Choose Language", list(langs.keys()))
+        st.title("⚖️ Alpha Apex")
+        target_lang = st.selectbox("🌐 Language", list(langs.keys()))
         lang_code = langs[target_lang]
         
-        st.divider()
-        # Case Management
         conn = sqlite3.connect(SQL_DB_FILE)
         cases = [r[0] for r in conn.execute("SELECT case_name FROM cases WHERE email=?", (st.session_state.user_email,)).fetchall()]
         conn.close()
+        st.session_state.active_case = st.selectbox("📁 Case File", cases if cases else ["General Consultation"])
         
-        if not cases: cases = ["General Consultation"]
-        st.session_state.active_case = st.selectbox("Active Case File", cases)
-        
-        if st.button("➕ New Case"):
-            # Logic to add a new row in SQL cases table
-            st.rerun()
+        if st.button("📧 Email Chat History"):
+            hist = db_load_history(st.session_state.user_email, st.session_state.active_case)
+            if send_email_report(st.session_state.user_email, st.session_state.active_case, hist):
+                st.success("Sent!")
 
-    st.header(f"💼 Case: {st.session_state.active_case}")
-    
-    # Quick Actions (Now respond in the local language)
+    # Top Quick Actions
+    st.header(f"💼 Chambers: {st.session_state.active_case}")
     c1, c2, c3 = st.columns(3)
     quick_q = None
-    if c1.button("🧠 Infer Path"): quick_q = "What is the recommended legal path forward?"
-    if c2.button("📜 Give Ruling"): quick_q = "Give a preliminary observation on these facts."
-    if c3.button("📝 Summarize"): quick_q = "Summarize the legal history of this case."
+    if c1.button("🧠 Infer Path"): quick_q = "Recommended legal path?"
+    if c2.button("📜 Ruling"): quick_q = "Preliminary observation?"
+    if c3.button("📝 Summarize"): quick_q = "Summarize the case."
 
-    # Chat Display
+    # Chat Logic
     history = db_load_history(st.session_state.user_email, st.session_state.active_case)
     for m in history:
         with st.chat_message(m["role"]): st.write(m["content"])
 
-    # Input Section
-    st.markdown("---")
     m_col, i_col = st.columns([1, 8])
-    with m_col:
-        # Mic configured for the selected local language
-        voice_in = speech_to_text(language=lang_code, key='mic_input', just_once=True)
-    with i_col:
-        text_in = st.chat_input(f"Consult in {target_lang}...")
+    with m_col: voice_in = speech_to_text(language=lang_code, key='mic', just_once=True)
+    with i_col: text_in = st.chat_input("Consult...")
 
-    user_query = quick_q or voice_in or text_in
-    if user_query:
-        db_save_message(st.session_state.user_email, st.session_state.active_case, "user", user_query)
-        with st.chat_message("user"): st.write(user_query)
+    query = quick_q or voice_in or text_in
+    if query:
+        db_save_message(st.session_state.user_email, st.session_state.active_case, "user", query)
+        with st.chat_message("user"): st.write(query)
         
-        # We instruct the AI to use the specific regional language
-        prompt = f"""
-        You are a Senior Legal Expert in Pakistan. 
-        Respond ONLY in the {target_lang} language. 
-        Use legal terminology appropriate for the Pakistan Penal Code or relevant local laws.
-        User Query: {user_query}
-        """
-        
-        try:
-            with st.chat_message("assistant"):
-                with st.spinner("⚖️ Processing..."):
-                    response = ai_engine.invoke(prompt).content
-                    st.write(response)
-                    db_save_message(st.session_state.user_email, st.session_state.active_case, "assistant", response)
-                    
-                    # Trigger Text-to-Speech
-                    play_voice_js(response, lang_code)
-        except Exception as e:
-            st.error(f"AI Connection Error: {e}")
+        response = load_llm().invoke(f"Respond in {target_lang}: {query}").content
+        with st.chat_message("assistant"):
+            st.write(response)
+            db_save_message(st.session_state.user_email, st.session_state.active_case, "assistant", response)
+            play_voice_js(response, lang_code) # Triggers TTS
+
+def render_library():
+    st.header("📚 Legal Library")
+    st.info("Browse Pakistan Penal Code (PPC), Constitution, and Case Law.")
+    st.write("Section 302: Punishment for Qatl-i-Amd...")
+
+def render_about():
+    st.header("ℹ️ About Alpha Apex")
+    st.write("AI-Powered Legal Assistant for Pakistan.")
+
 # ==============================================================================
-# 4. MAIN
+# 4. MAIN APP FLOW
 # ==============================================================================
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
-    email = st.text_input("Enter Email to start")
-    if st.button("Login"):
-        if "@" in email:
-            st.session_state.logged_in = True
-            st.session_state.user_email = email
-            conn = sqlite3.connect(SQL_DB_FILE)
-            conn.execute("INSERT OR IGNORE INTO users VALUES (?,?,?)", (email, email.split("@")[0], "2024-01-01"))
-            conn.execute("INSERT OR IGNORE INTO cases (email, case_name, created_at) VALUES (?,?,?)", (email, "General Consultation", "2024-01-01"))
-            conn.commit()
-            conn.close()
-            st.rerun()
+    email = st.text_input("Login with Email")
+    if st.button("Start"):
+        st.session_state.logged_in = True
+        st.session_state.user_email = email
+        st.rerun()
 else:
-    render_chambers_page()
-
-
-
-
+    # Sidebar Navigation Option (Restored)
+    page = st.sidebar.radio("Navigation", ["Chambers", "Legal Library", "About"])
+    if page == "Chambers": render_chambers()
+    elif page == "Legal Library": render_library()
+    else: render_about()
