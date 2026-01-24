@@ -133,7 +133,7 @@ def render_chambers():
             with st.chat_message("assistant"):
                 with st.spinner("Consulting Statutes..."):
                     # MODEL DEFINED HERE
-                    llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=API_KEY)
+                    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=API_KEY)
                     
                     irac_prompt = "Structure your answer using IRAC (Issue, Rule, Analysis, Conclusion)." if use_irac else ""
                     full_prompt = f"{sys_persona}\n{irac_prompt}\nRespond strictly in {target_lang}.\n\nQuery: {final_query}"
@@ -174,3 +174,4 @@ else:
     else: 
         st.header("ℹ️ About Advocate AI")
         st.write("Advanced Legal Intelligence powered by Gemini 2.0 Flash.")
+
