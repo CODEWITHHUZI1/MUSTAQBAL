@@ -51,7 +51,7 @@ init_sql_db()
 @st.cache_resource
 def load_llm():
     return ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash", 
+        model="gemini-2.5-flash", 
         google_api_key=API_KEY, 
         temperature=0.3,
         safety_settings={
@@ -150,4 +150,5 @@ if not st.session_state.logged_in:
             st.rerun()
 else:
     render_chambers_page()
+
 
