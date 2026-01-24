@@ -246,7 +246,7 @@ def get_analytical_engine():
     """Initializes Gemini with strictly tuned legal parameters."""
     api_key_vault = st.secrets["GOOGLE_API_KEY"]
     return ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash", 
+        model="gemini-2.5-flash", 
         google_api_key=api_key_vault, 
         temperature=0.2,
         max_output_tokens=4000
@@ -524,4 +524,5 @@ else:
 # ==============================================================================
 # END OF SCRIPT - 500+ LINES OF OMNIPOTENCE PRODUCTION CODE
 # ==============================================================================
+
 
