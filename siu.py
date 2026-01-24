@@ -236,14 +236,24 @@ def login_page():
                         st.session_state.username = e.split("@")[0].title()
                         db_register_user(e, st.session_state.username)
                         st.rerun()
-# ==============================================================================
-# 6. CHAMBERS PAGE (FIXED LAYOUT)
-# ==============================================================================
-
 def render_chambers_page():
-    # 1. Sidebar Logic
+    # 1. Sidebar Logic (Enhanced with Risk Dashboard & Timeline)
     with st.sidebar:
         st.header(f"👨‍⚖️ {st.session_state.username}")
+        
+        # --- RISK DASHBOARD ---
+        history = db_load_history(st.session_state.user_email, st.session_state.active_case)
+        danger_words = ["court", "arrest", "penalty", "illegal", "suit", "police", "notice", "jail", "fine"]
+        risk_score = min(sum((" ".join([m["content"].lower() for m in history])).count(w) for w in danger_words) * 12, 100)
+        
+        st.subheader("📊 Case Risk Profile")
+        st.progress(risk_score / 100)
+        if risk_score > 60: st.error(f"HIGH RISK: {risk_score}%")
+        elif risk_score > 30: st.warning(f"MEDIUM RISK: {risk_score}%")
+        else: st.success("LOW RISK: Stable")
+        
+        st.divider()
+
         cases = db_get_cases(st.session_state.user_email)
         if "active_case" not in st.session_state: st.session_state.active_case = cases[0]
         sel = st.selectbox("Case Files", cases, index=cases.index(st.session_state.active_case))
@@ -251,6 +261,15 @@ def render_chambers_page():
             st.session_state.active_case = sel
             st.rerun()
         
+        # --- TIMELINE BUTTON ---
+        if st.button("🕒 Extract Timeline"):
+            with st.expander("📅 Case Milestones", expanded=True):
+                if not history:
+                    st.write("No data yet.")
+                else:
+                    t_prompt = f"Extract only legal dates and events as a list from: {' '.join([m['content'] for m in history])}"
+                    st.write(ai_engine.invoke(t_prompt).content)
+
         with st.expander("Rename Case"):
             nt = st.text_input("New Name", value=st.session_state.active_case)
             if st.button("Confirm"):
@@ -269,22 +288,24 @@ def render_chambers_page():
 
     st.title(f"⚖️ {st.session_state.active_case}")
 
-    # 2. Chat History Block (ALWAYS ABOVE INPUT)
+    # 2. Chat History Block
     history_container = st.container()
     with history_container:
-        history = db_load_history(st.session_state.user_email, st.session_state.active_case)
         for msg in history:
             with st.chat_message(msg["role"]): st.markdown(msg["content"])
 
-    # 3. Input Tools Block (STAYS AT THE BOTTOM)
+    # 3. Input Tools Block (Enhanced with Language Toggle)
     input_placeholder = st.container()
     with input_placeholder:
+        # --- LANGUAGE TOGGLE ---
+        use_urdu = st.toggle("Urdu/Sindh Mode 🇵🇰", help="Switch AI response to Urdu script")
+        
         c_text, c_mic = st.columns([10, 1])
         with c_text:
             text_in = st.chat_input("Ask Sindh Law / قانونی سوال...")
         with c_mic:
             st.markdown('<div class="mic-box">', unsafe_allow_html=True)
-            voice_in = speech_to_text(language='ur-PK', start_prompt="🎤", stop_prompt="⏹️", key='mic_chambers', just_once=True)
+            voice_in = speech_to_text(language='ur-PK' if use_urdu else 'en-US', start_prompt="🎤", stop_prompt="⏹️", key='mic_chambers', just_once=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
     # 4. Logic Handling
@@ -293,17 +314,21 @@ def render_chambers_page():
 
     if final_in:
         db_save_message(st.session_state.user_email, st.session_state.active_case, "user", final_in)
-        # Append immediately to history container
         with history_container:
             with st.chat_message("user"): st.markdown(final_in)
             with st.chat_message("assistant"):
                 p, res = st.empty(), ""
-                ctx = ""
-                if st.session_state.law_db:
-                    docs = st.session_state.law_db.as_retriever(search_kwargs={"k": 4}).invoke(final_in)
-                    ctx = "\n\n".join([d.page_content for d in docs])
+                ctx, sources = "", []
                 
-                prompt = f"Senior Legal Expert Sindh Law. Use same language as user (Urdu script or English).\nContext: {ctx}\nUser: {final_in}"
+                if st.session_state.law_db:
+                    docs = st.session_state.law_db.as_retriever(search_kwargs={"k": 3}).invoke(final_in)
+                    ctx = "\n\n".join([d.page_content for d in docs])
+                    # --- SOURCE EXTRACTION ---
+                    sources = [f"📄 {os.path.basename(d.metadata['source'])} (Pg. {d.metadata.get('page', '??')})" for d in docs]
+                
+                # --- DUAL LANGUAGE PROMPT ---
+                lang_instruction = "Respond in Urdu script (Urdu language)." if use_urdu else "Respond in English."
+                prompt = f"Senior Legal Expert Sindh Law. {lang_instruction}\nContext: {ctx}\nUser: {final_in}"
                 
                 try:
                     ai_out = ai_engine.invoke(prompt).content
@@ -311,10 +336,15 @@ def render_chambers_page():
                         res += chunk
                         p.markdown(res + "▌")
                     p.markdown(res)
+                    
+                    # --- SHOW SOURCES ---
+                    if sources:
+                        with st.expander("📚 Legal Citations"):
+                            for s in sources: st.caption(s)
+                            
                     db_save_message(st.session_state.user_email, st.session_state.active_case, "assistant", res)
                     if is_v: play_voice_js(res)
                 except Exception as e: st.error(f"Error: {e}")
-
 # ==============================================================================
 # 7. MAIN
 # ==============================================================================
@@ -368,6 +398,7 @@ else:
         * Daniyal Faraz
 
         """)
+
 
 
 
