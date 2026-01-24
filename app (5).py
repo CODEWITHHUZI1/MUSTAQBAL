@@ -240,7 +240,7 @@ def render_chambers():
 # ==============================================================================
 
 def render_library():
-    st.header("📚 Digital Law Library")
+    st.header("📚  Law Library")
     if st.button("🔄 Trigger Library Rescan"): sync_data_folder(); st.rerun()
     library_docs = sqlite3.connect(SQL_DB_FILE).execute("SELECT name, size, pages, indexed FROM documents").fetchall()
     if library_docs: st.table(pd.DataFrame(library_docs, columns=["Document Title", "File Size", "Page Count", "Indexing Status"]))
@@ -311,6 +311,7 @@ else:
     if navigation_selection == "Consultation Chambers": render_chambers()
     elif navigation_selection == "Digital Library": render_library()
     else: render_about()
+
 
 
 
