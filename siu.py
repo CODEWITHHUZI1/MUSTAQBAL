@@ -6,6 +6,7 @@ import streamlit as st
 import sqlite3
 import datetime
 import smtplib
+import time
 import streamlit.components.v1 as components
 from langchain_google_genai import ChatGoogleGenerativeAI
 from streamlit_mic_recorder import speech_to_text
@@ -50,74 +51,88 @@ def db_load_history(email, case_name):
 init_sql_db()
 
 # ==============================================================================
-# 2. VOICE ENGINE WITH REGIONAL FALLBACK
+# 2. CORE UTILITIES & VOICE ENGINE
 # ==============================================================================
+def send_email_report(receiver_email, case_name, history):
+    try:
+        sender_email = st.secrets["EMAIL_USER"]
+        sender_password = st.secrets["EMAIL_PASS"]
+        report_content = f"Legal Report: {case_name}\n" + "="*30 + "\n\n"
+        for m in history:
+            role = "Counsel" if m['role'] == 'assistant' else "Client"
+            report_content += f"[{role}]: {m['content']}\n\n"
+        msg = MIMEMultipart()
+        msg['From'] = f"Alpha Apex <{sender_email}>"; msg['To'] = receiver_email
+        msg['Subject'] = f"Legal Summary: {case_name}"
+        msg.attach(MIMEText(report_content, 'plain'))
+        server = smtplib.SMTP('smtp.gmail.com', 587); server.starttls()
+        server.login(sender_email, sender_password); server.send_message(msg); server.quit()
+        return True
+    except Exception as e:
+        st.error(f"Email Failed: {e}"); return False
+
+@st.cache_resource
+def load_llm():
+    return ChatGoogleGenerativeAI(
+        model="gemini-2.0-flash", google_api_key=API_KEY, temperature=0.2,
+        safety_settings={"HARM_CATEGORY_HARASSMENT": "BLOCK_NONE", "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE", "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE", "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE"}
+    )
+
 def play_voice_js(text, lang_code):
     safe_text = text.replace('\\', '\\\\').replace("'", "\\'").replace('"', '\\"').replace("\n", " ").strip()
     js_code = f"""
-    <div style="background: #f1f5f9; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px; font-family: sans-serif;">
-        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-            <span style="font-weight: 600; color: #1e293b;">Voice Controller</span>
-            <span style="font-size: 0.75rem; background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 99px;">{lang_code} Mode</span>
-        </div>
-        <div style="display: flex; gap: 8px; align-items: center;">
-            <button onclick="window.speechSynthesis.resume()" style="padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; cursor: pointer;">Play</button>
-            <button onclick="window.speechSynthesis.pause()" style="padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; cursor: pointer;">Pause</button>
-            <button onclick="window.speechSynthesis.cancel()" style="padding: 6px 12px; border-radius: 6px; border: none; background: #ef4444; color: white; cursor: pointer;">Stop</button>
-            <select id="rate" onchange="window.updateSpeed(this.value)" style="margin-left: 10px; padding: 4px; border-radius: 4px;">
-                <option value="0.8">0.8x</option>
-                <option value="1.0" selected>1.0x</option>
-                <option value="1.2">1.2x</option>
-            </select>
-        </div>
+    <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border: 1px solid #dee2e6; margin: 10px 0;">
+        <span style="font-size: 0.85rem; font-weight: bold; color: #495057; margin-right: 10px;">🔊 Audio Control:</span>
+        <button onclick="window.speechSynthesis.resume()" style="border: 1px solid #ced4da; background: white; padding: 4px 10px; border-radius: 4px; cursor: pointer;">Play</button>
+        <button onclick="window.speechSynthesis.pause()" style="border: 1px solid #ced4da; background: white; padding: 4px 10px; border-radius: 4px; cursor: pointer;">Pause</button>
+        <button onclick="window.speechSynthesis.cancel()" style="border: none; background: #dc3545; color: white; padding: 4px 10px; border-radius: 4px; cursor: pointer;">Stop</button>
+        <select id="rate" onchange="window.updateSpeed(this.value)" style="margin-left: 10px; padding: 2px;">
+            <option value="0.8">0.8x</option>
+            <option value="1.0" selected>1.0x</option>
+            <option value="1.2">1.2x</option>
+        </select>
     </div>
     <script>
         window.speechRate = 1.0;
-        window.updateSpeed = function(v) {{
-            window.speechRate = parseFloat(v);
-            window.triggerSpeak();
-        }};
-
+        window.updateSpeed = function(v) {{ window.speechRate = parseFloat(v); window.triggerSpeak(); }};
         window.triggerSpeak = function() {{
             window.speechSynthesis.cancel();
             var utterance = new SpeechSynthesisUtterance("{safe_text}");
             utterance.rate = window.speechRate;
-            
             var voices = window.speechSynthesis.getVoices();
-            
-            // LOGIC: Find regional voice OR use Urdu/Hindi as fallback for Pashto/Sindhi/Balochi
             var targetLang = "{lang_code}".split('-')[0];
             var voice = voices.find(v => v.lang.startsWith(targetLang)) || 
                         voices.find(v => v.lang.startsWith('ur')) || 
                         voices.find(v => v.lang.startsWith('hi'));
-            
             if(voice) utterance.voice = voice;
             window.speechSynthesis.speak(utterance);
         }};
-
-        if (window.speechSynthesis.onvoiceschanged !== undefined) {{
-            window.speechSynthesis.onvoiceschanged = window.triggerSpeak;
-        }}
+        if (window.speechSynthesis.onvoiceschanged !== undefined) {{ window.speechSynthesis.onvoiceschanged = window.triggerSpeak; }}
         window.triggerSpeak();
     </script>
     """
-    components.html(js_code, height=120)
+    components.html(js_code, height=100)
 
 # ==============================================================================
-# 3. CHAMBERS & CASE MANAGEMENT
+# 3. CHAMBERS
 # ==============================================================================
 def render_chambers():
-    langs = {
-        "English": "en-US", "Urdu": "ur-PK", "Sindhi": "sd-PK", 
-        "Punjabi": "pa-PK", "Pashto": "ps-PK", "Balochi": "bal-PK"
-    }
+    langs = {"English": "en-US", "Urdu": "ur-PK", "Sindhi": "sd-PK", "Punjabi": "pa-PK", "Pashto": "ps-PK", "Balochi": "bal-PK"}
     
     if "last_spoken" not in st.session_state: st.session_state.last_spoken = None
 
     with st.sidebar:
         st.title("⚖️ Alpha Apex")
-        target_lang = st.selectbox("🌐 Select Language", list(langs.keys()))
+        target_lang = st.selectbox("🌐 Language", list(langs.keys()))
         lang_code = langs[target_lang]
+
+        st.divider()
+        st.subheader("🏛️ System Configuration")
+        with st.expander("Custom Instructions & Behavior", expanded=True):
+            sys_persona = st.text_input("Core Persona:", value="#You are a Pakistani law analyst")
+            custom_instructions = st.text_area("Custom System Instructions:", 
+                placeholder="e.g. Focus on inheritance law, always cite PPC 302, etc.")
+            use_irac = st.toggle("Enable IRAC Style", value=True)
         
         st.divider()
         st.subheader("📁 Case Management")
@@ -125,35 +140,36 @@ def render_chambers():
         cases = [r[0] for r in conn.execute("SELECT case_name FROM cases WHERE email=?", (st.session_state.user_email,)).fetchall()]
         conn.close()
         
-        active_case = st.selectbox("Active Case", cases if cases else ["General Consultation"])
+        active_case = st.selectbox("Current Case", cases if cases else ["General Consultation"])
         st.session_state.active_case = active_case
 
-        new_case_name = st.text_input("New Case Name")
-        if st.button("➕ Create Case"):
-            if new_case_name:
+        new_case = st.text_input("New Case Name")
+        if st.button("➕ Create"):
+            if new_case:
                 conn = sqlite3.connect(SQL_DB_FILE)
-                conn.execute("INSERT INTO cases (email, case_name, created_at) VALUES (?,?,?)", 
-                             (st.session_state.user_email, new_case_name, datetime.datetime.now().strftime("%Y-%m-%d")))
+                conn.execute("INSERT INTO cases (email, case_name, created_at) VALUES (?,?,?)", (st.session_state.user_email, new_case, "2026-01-24"))
                 conn.commit(); conn.close(); st.rerun()
 
-        if st.button("🗑️ Delete Current Case"):
+        if st.button("🗑️ Delete"):
             conn = sqlite3.connect(SQL_DB_FILE)
             conn.execute("DELETE FROM cases WHERE email=? AND case_name=?", (st.session_state.user_email, active_case))
             conn.commit(); conn.close(); st.rerun()
 
-        st.divider()
-        with st.expander("System Persona"):
-            sys_persona = st.text_input("Role:", value="You are a Pakistani law analyst")
-            use_irac = st.toggle("Use IRAC Structure", value=True)
+        if st.button("📧 Email History"):
+            hist = db_load_history(st.session_state.user_email, st.session_state.active_case)
+            if send_email_report(st.session_state.user_email, st.session_state.active_case, hist):
+                st.success("Sent!")
 
-    st.header(f"💼 Case: {st.session_state.active_case}")
+    st.header(f"💼 Chambers: {st.session_state.active_case}")
     
+    # UI Layout: History ABOVE input
     chat_container = st.container()
     st.divider()
     
+    # Input Area
     m_col, i_col = st.columns([1, 8])
     with m_col: voice_in = speech_to_text(language=lang_code, key='mic', just_once=True)
-    with i_col: text_in = st.chat_input("Ask a legal question...")
+    with i_col: text_in = st.chat_input("Start legal consultation...")
 
     history = db_load_history(st.session_state.user_email, st.session_state.active_case)
     with chat_container:
@@ -164,12 +180,11 @@ def render_chambers():
     if query:
         db_save_message(st.session_state.user_email, st.session_state.active_case, "user", query)
         try:
-            # Load LLM
-            llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=API_KEY)
-            prompt = f"{sys_persona}. Respond strictly in {target_lang}. IRAC: {use_irac}\nQuery: {query}"
-            response = llm.invoke(prompt).content
+            irac_style = "Structure response using IRAC." if use_irac else "Professional response."
+            full_system_prompt = f"{sys_persona}\n{irac_style}\nADDITIONAL: {custom_instructions}\nLANGUAGE: {target_lang}"
+            response = load_llm().invoke(f"{full_system_prompt}\n\nClient Query: {query}").content
             db_save_message(st.session_state.user_email, st.session_state.active_case, "assistant", response)
-            st.rerun()
+            st.rerun() 
         except Exception as e:
             st.error(f"Error: {e}")
 
@@ -179,22 +194,40 @@ def render_chambers():
             st.session_state.last_spoken = history[-1]["content"]
 
 # ==============================================================================
-# 4. MAIN NAVIGATION
+# 4. LIBRARY & ABOUT
 # ==============================================================================
-if "logged_in" not in st.session_state: st.session_state.logged_in = False
+def render_library():
+    st.header("📚 Legal Library")
+    st.info("Direct access to Pakistan Penal Code (PPC) and Constitutional Amendments.")
+    st.write("Current selection: **Pakistan Penal Code 1860**")
+    st.write("---")
+    st.markdown("- **Section 302:** Punishment of qatl-i-amd.")
+    st.markdown("- **Section 420:** Cheating and dishonestly inducing delivery of property.")
 
+def render_about():
+    st.header("ℹ️ About Alpha Apex")
+    st.write("Alpha Apex is an AI-powered legal intelligence system.")
+    team = [
+        {"Name": "Saim Ahmed", "Contact": "03700297696", "Email": "saimahmed.work733@gmail.com"},
+        {"Name": "Huzaifa Khan", "Contact": "03102526567", "Email": "m.huzaifa.khan471@gmail.com"},
+        {"Name": "Mustafa Khan", "Contact": "03460222290", "Email": "muhammadmustafakhan430@gmail.com"},
+        {"Name": "Ibrahim Sohail", "Contact": "03212046403", "Email": "ibrahimsohailkhan10@gmail.com"},
+        {"Name": "Daniyal Faraz", "Contact": "03333502530", "Email": "daniyalfarazkhan2012@gmail.com"},
+    ]
+    st.table(team)
+
+if "logged_in" not in st.session_state: st.session_state.logged_in = False
 if not st.session_state.logged_in:
     st.title("⚖️ Alpha Apex Login")
-    email = st.text_input("Email")
-    if st.button("Enter"):
-        st.session_state.logged_in = True; st.session_state.user_email = email
-        conn = sqlite3.connect(SQL_DB_FILE)
-        conn.execute("INSERT OR IGNORE INTO cases (email, case_name, created_at) VALUES (?,?,?)", (email, "General Consultation", "2026-01-24"))
-        conn.commit(); conn.close(); st.rerun()
+    email = st.text_input("Email Address")
+    if st.button("Access"):
+        if "@" in email:
+            st.session_state.logged_in = True; st.session_state.user_email = email
+            conn = sqlite3.connect(SQL_DB_FILE)
+            conn.execute("INSERT OR IGNORE INTO cases (email, case_name, created_at) VALUES (?,?,?)", (email, "General Consultation", "2026-01-24"))
+            conn.commit(); conn.close(); st.rerun()
 else:
-    page = st.sidebar.radio("Nav", ["Chambers", "About"])
+    page = st.sidebar.radio("Navigation", ["Chambers", "Legal Library", "About"])
     if page == "Chambers": render_chambers()
-    else:
-        st.header("ℹ️ Alpha Apex Team")
-        team = [{"Name": "Saim Ahmed", "Contact": "03700297696"}, {"Name": "Huzaifa Khan", "Contact": "03102526567"}, {"Name": "Mustafa Khan", "Contact": "03460222290"}, {"Name": "Ibrahim Sohail", "Contact": "03212046403"}, {"Name": "Daniyal Faraz", "Contact": "03333502530"}]
-        st.table(team)
+    elif page == "Legal Library": render_library()
+    else: render_about()
