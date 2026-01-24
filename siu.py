@@ -5,12 +5,9 @@ sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import streamlit as st
 import sqlite3
 import datetime
-import smtplib
 import streamlit.components.v1 as components
 from langchain_google_genai import ChatGoogleGenerativeAI
 from streamlit_mic_recorder import speech_to_text
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 # ==============================================================================
 # 1. INITIALIZATION & DATABASE
@@ -22,7 +19,7 @@ if "voice_speed" not in st.session_state: st.session_state.voice_speed = 1.0
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 
 API_KEY = st.secrets["GEMINI_API_KEY"]
-SQL_DB_FILE = "advocate_ai_clean.db"
+SQL_DB_FILE = "advocate_ai_master.db"
 
 def init_sql_db():
     conn = sqlite3.connect(SQL_DB_FILE)
@@ -75,83 +72,39 @@ def inject_voice_js(text, speed):
     components.html(js_code, height=0)
 
 # ==============================================================================
-# 3. PAGES & FEATURES
+# 3. CHAMBERS
 # ==============================================================================
-def render_about():
-    st.title("ℹ️ About Alpha Apex")
-    st.markdown("""
-    ### 🏛️ The Digital Advocate
-    Alpha Apex is designed to bridge the gap between complex legal statutes and the people of Pakistan.
-    **Features:**
-    * **Multilingual:** Sindhi, Pashto, Balochi, Urdu, Punjabi.
-    * **Audio:** English audio summaries.
-    * **Library:** PPC, Constitution references.
-    """)
-
 def render_chambers():
     langs = {"English": "en-US", "Urdu": "ur-PK", "Sindhi": "sd-PK", "Punjabi": "pa-PK", "Pashto": "ps-PK", "Balochi": "bal-PK"}
     
-    # --- SIDEBAR (ALL FEATURES INTACT) ---
     with st.sidebar:
         st.title("⚖️ Alpha Apex")
         target_lang = st.selectbox("🌐 Language", list(langs.keys()))
-        
-        st.divider()
-        st.subheader("⚙️ Personalization")
         sys_persona = st.text_input("AI Persona:", value="You are a Pakistani Law Analyst.")
         use_irac = st.toggle("Enable IRAC Format", value=True)
         
         st.divider()
-        st.subheader("📚 Legal Library")
-        with st.expander("View Statutes"):
-            st.markdown("- **PPC:** Pakistan Penal Code\n- **CrPC:** Criminal Procedure Code\n- **QSO:** Qanun-e-Shahadat Order")
-
-        st.divider()
-        st.subheader("📁 Case Settings")
         conn = sqlite3.connect(SQL_DB_FILE)
         cases = [r[0] for r in conn.execute("SELECT case_name FROM cases WHERE email=?", (st.session_state.user_email,)).fetchall()]
         conn.close()
-        
-        if not cases: cases = ["General"]
-        active_case = st.selectbox("Select Case", cases)
+        active_case = st.selectbox("Select Case", cases if cases else ["General"])
         st.session_state.active_case = active_case
 
-        c1, c2 = st.columns(2)
-        with c1:
-            new_case = st.text_input("New Case", label_visibility="collapsed", placeholder="Name...")
-            if st.button("➕ Add"):
-                if new_case:
-                    conn = sqlite3.connect(SQL_DB_FILE)
-                    conn.execute("INSERT INTO cases (email, case_name, created_at) VALUES (?,?,?)", (st.session_state.user_email, new_case, "2026"))
-                    conn.commit(); conn.close(); st.rerun()
-        with c2:
-            if st.button("🗑️ Del"):
-                if active_case != "General":
-                    conn = sqlite3.connect(SQL_DB_FILE)
-                    conn.execute("DELETE FROM cases WHERE email=? AND case_name=?", (st.session_state.user_email, active_case))
-                    conn.commit(); conn.close(); st.rerun()
+    st.header(f"💼 {active_case}")
 
-    # --- TOP HEADER ---
-    h1, h2 = st.columns([8, 2])
-    with h1: st.header(f"💼 {active_case}")
-    with h2: 
-        if st.button("📧 Email Chat"): st.toast("Email Report Sent!")
-
-    # --- CHAT AREA ---
+    # Display History
     history = db_load_history(st.session_state.user_email, active_case)
     for m in history:
         with st.chat_message(m["role"]): st.write(m["content"])
     
     st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
 
-    # --- FIXED BOTTOM BAR ---
+    # FIXED BOTTOM BAR
     with st.container():
         st.divider()
-        # Audio Tools (Conditional)
         if st.session_state.show_audio_tools and target_lang == "English":
             ac1, ac2 = st.columns([4, 6])
             with ac1:
-                st.caption("Audio Controls")
                 b_p, b_pa, b_s = st.columns(3)
                 if b_p.button("▶️ Play"): components.html("<script>window.parent.speakNow()</script>", height=0)
                 if b_pa.button("⏸️ Pause"): components.html("<script>window.parent.pauseNow()</script>", height=0)
@@ -159,46 +112,45 @@ def render_chambers():
             with ac2:
                 st.session_state.voice_speed = st.slider("Speed", 0.5, 2.0, st.session_state.voice_speed)
 
-        # --- MODIFIED PROMPT BAR (3 Columns instead of 4) ---
         c_hp, c_txt, c_mic = st.columns([1, 8, 1])
-        
-        # Column 1: Headphone
         with c_hp: 
             if st.button("🎧"): 
                 st.session_state.show_audio_tools = not st.session_state.show_audio_tools
                 st.rerun()
-        
-        # Column 2: Text Input (Wider now)
         with c_txt: text_in = st.chat_input("Ask Alpha Apex...")
-        
-        # Column 3: Mic
         with c_mic: mic_in = speech_to_text(language=langs[target_lang], key='mic', just_once=True)
 
-    # --- LOGIC CORE ---
+    # RESPONSE LOGIC
     query = text_in or mic_in
     if query:
+        # 1. Save and Show User Query
         db_save_message(st.session_state.user_email, active_case, "user", query)
+        
+        # 2. Generate and Show AI Response
         try:
-            llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=API_KEY)
+            llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=API_KEY)
             irac = "Structure: Issue, Rule, Analysis, Conclusion." if use_irac else ""
-            prompt = f"{sys_persona}\n{irac}\nRespond strictly in {target_lang} script.\n\nQuery: {query}"
+            prompt = f"{sys_persona}\n{irac}\nRespond strictly in {target_lang} script. Query: {query}"
             
-            response = llm.invoke(prompt).content
-            db_save_message(st.session_state.user_email, active_case, "assistant", response)
-            st.rerun()
-        except Exception as e: st.error(f"Error: {e}")
+            with st.spinner("Analyzing..."):
+                response = llm.invoke(prompt).content
+                db_save_message(st.session_state.user_email, active_case, "assistant", response)
+                st.rerun() # Refresh to show the new exchange
+        except Exception as e:
+            st.error(f"Error: {e}")
 
+    # TTS Trigger
     if history and history[-1]["role"] == "assistant" and target_lang == "English":
         if st.session_state.show_audio_tools:
             inject_voice_js(history[-1]["content"], st.session_state.voice_speed)
 
 # ==============================================================================
-# 4. MAIN NAVIGATION
+# 4. EXECUTION
 # ==============================================================================
 if not st.session_state.logged_in:
     st.title("⚖️ Alpha Apex Login")
-    email = st.text_input("Email Address")
-    if st.button("Enter Chambers"):
+    email = st.text_input("Email")
+    if st.button("Enter"):
         st.session_state.logged_in = True
         st.session_state.user_email = email
         conn = sqlite3.connect(SQL_DB_FILE)
@@ -208,5 +160,4 @@ if not st.session_state.logged_in:
 else:
     page = st.sidebar.radio("Navigation", ["Chambers", "About"])
     if page == "Chambers": render_chambers()
-    else: render_about()
-
+    else: st.write("Legal AI platform.")
