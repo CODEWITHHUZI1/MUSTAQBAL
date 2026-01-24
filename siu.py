@@ -82,7 +82,7 @@ def send_email_report(receiver_email, case_name, history):
 def load_llm():
     # Fix for ChatGoogleGenerativeAIError: Removing safety blocks for legal context
     return ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash", 
+        model="gemini-2.5-flash", 
         google_api_key=API_KEY, 
         temperature=0.3,
         max_retries=3,
@@ -195,3 +195,4 @@ else:
     if page == "Chambers": render_chambers()
     elif page == "Legal Library": render_library()
     else: render_about()
+
