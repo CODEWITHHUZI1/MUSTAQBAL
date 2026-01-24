@@ -5,6 +5,7 @@ sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import streamlit as st
 import sqlite3
 import datetime
+import pyttsx3
 import smtplib
 import time
 import streamlit.components.v1 as components
@@ -234,4 +235,5 @@ else:
     if page == "Chambers": render_chambers()
     elif page == "Legal Library": render_library()
     else: render_about()
+
 
