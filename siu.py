@@ -180,27 +180,18 @@ def render_chambers():
                 st.session_state.last_spoken = roman_part
 
 # ==============================================================================
-# 4. NAVIGATION
+# 4. LIBRARY, ABOUT & NAVIGATION
 # ==============================================================================
-if "logged_in" not in st.session_state: st.session_state.logged_in = False
-if not st.session_state.logged_in:
-    st.title("⚖️ Alpha Apex Login")
-    email = st.text_input("Email")
-    if st.button("Login"):
-        st.session_state.logged_in = True; st.session_state.user_email = email
-        conn = sqlite3.connect(SQL_DB_FILE)
-        conn.execute("INSERT OR IGNORE INTO cases (email, case_name, created_at) VALUES (?,?,?)", (email, "General", "2026-01-24"))
-        conn.commit(); conn.close(); st.rerun()
-elif:
-    page = st.sidebar.radio("Nav", ["Chambers", "Library", "About"])
-    if page == "Chambers": render_chambers()
-    elif page == "Library": st.header("📚 Library")
-    else page == "About":   st.header("ℹ️ About Alpha Apex")
-else:
-   
+
+def render_library():
+    st.header("📚 Library")
+    st.info("Pakistan Penal Code (PPC) and Constitutional Statutes reference.")
+    # Add your library content here
+
+def render_about():
     st.header("ℹ️ About Alpha Apex")
     
-    # 1. Mission Statement or Description
+    # 1. Mission Statement
     st.markdown("""
     ### 🏛️ Our Mission
     Alpha Apex is an AI-driven legal intelligence platform designed to provide 
@@ -222,9 +213,36 @@ else:
     ]
     st.table(team)
 
-    # 3. Version Info
     st.caption("Alpha Apex v5.0 | Last Updated: January 2026")
+
+# --- MAIN APP FLOW ---
+if "logged_in" not in st.session_state: 
+    st.session_state.logged_in = False
+
+if not st.session_state.logged_in:
+    st.title("⚖️ Alpha Apex Login")
+    email = st.text_input("Email")
+    if st.button("Login"):
+        st.session_state.logged_in = True
+        st.session_state.user_email = email
+        conn = sqlite3.connect(SQL_DB_FILE)
+        conn.execute("INSERT OR IGNORE INTO cases (email, case_name, created_at) VALUES (?,?,?)", 
+                     (email, "General", "2026-01-24"))
+        conn.commit()
+        conn.close()
+        st.rerun()
+else:
+    # Sidebar Navigation
+    page = st.sidebar.radio("Nav", ["Chambers", "Library", "About"])
+    
+    if page == "Chambers":
+        render_chambers()
+    elif page == "Library":
+        render_library()
+    elif page == "About":
+        render_about()
         
+
 
 
 
