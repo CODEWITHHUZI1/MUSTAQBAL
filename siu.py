@@ -1,14 +1,4 @@
- Conversation opened. 1 unread message.
 
-Skip to content
-Using Gmail with screen readers
-1 of 146
-(no subject)
-Inbox
-
-Muhammad Mustafa Khan - 88
-12:39 PM (0 minutes ago)
-to me
 
 import streamlit as st
 import os
@@ -379,9 +369,5 @@ else:
         * Daniyal Faraz
 
         """)
-Compose:
-app.py requirement.txt
-MinimizePop-outClose
-ibrahimsohailkhan10@gmail.com
-app.py requirement.txt
+
 
