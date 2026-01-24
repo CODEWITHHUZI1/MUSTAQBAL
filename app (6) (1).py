@@ -137,7 +137,7 @@ def apply_leviathan_shaders(theme_mode):
 # ==============================================================================
 
 SQL_DB_FILE = "alpha_apex_leviathan_master_v24.db"
-DATA_FOLDER = "law_library_assets"
+DATA_FOLDER = "DATA"
 
 if not os.path.exists(DATA_FOLDER):
     os.makedirs(DATA_FOLDER)
@@ -524,3 +524,4 @@ else:
 # ==============================================================================
 # END OF SCRIPT - 500+ LINES OF OMNIPOTENCE PRODUCTION CODE
 # ==============================================================================
+
