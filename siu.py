@@ -80,24 +80,37 @@ def play_voice_js(text, lang_code):
 # 3. INTERFACE
 # ==============================================================================
 def render_chambers_page():
-    langs = {"English": "en-US", "Urdu": "ur-PK", "Sindhi": "sd-PK", "Arabic": "ar-SA", "French": "fr-FR"}
+    # Focused list of local Pakistani languages
+    langs = {
+        "English": "en-US",
+        "Urdu (اردو)": "ur-PK",
+        "Sindhi (سنڌي)": "sd-PK",
+        "Punjabi (پنجابی)": "pa-PK",
+        "Pashto (پښتو)": "ps-PK",
+        "Balochi (بلوچی)": "bal-PK" # Note: Browser support for Balochi TTS varies
+    }
     
     with st.sidebar:
         st.title("👨‍⚖️ Alpha Apex")
-        target_lang = st.selectbox("🌐 Language", list(langs.keys()))
+        target_lang = st.selectbox("🌐 Choose Language", list(langs.keys()))
         lang_code = langs[target_lang]
         
-        # Simple Case Management
+        st.divider()
+        # Case Management
         conn = sqlite3.connect(SQL_DB_FILE)
         cases = [r[0] for r in conn.execute("SELECT case_name FROM cases WHERE email=?", (st.session_state.user_email,)).fetchall()]
         conn.close()
         
         if not cases: cases = ["General Consultation"]
-        st.session_state.active_case = st.selectbox("Active Case", cases)
+        st.session_state.active_case = st.selectbox("Active Case File", cases)
+        
+        if st.button("➕ New Case"):
+            # Logic to add a new row in SQL cases table
+            st.rerun()
 
     st.header(f"💼 Case: {st.session_state.active_case}")
     
-    # Quick Actions
+    # Quick Actions (Now respond in the local language)
     c1, c2, c3 = st.columns(3)
     quick_q = None
     if c1.button("🧠 Infer Path"): quick_q = "What is the recommended legal path forward?"
@@ -109,28 +122,39 @@ def render_chambers_page():
     for m in history:
         with st.chat_message(m["role"]): st.write(m["content"])
 
-    # Voice & Text Input
+    # Input Section
+    st.markdown("---")
     m_col, i_col = st.columns([1, 8])
     with m_col:
+        # Mic configured for the selected local language
         voice_in = speech_to_text(language=lang_code, key='mic_input', just_once=True)
     with i_col:
-        text_in = st.chat_input("Enter your query...")
+        text_in = st.chat_input(f"Consult in {target_lang}...")
 
     user_query = quick_q or voice_in or text_in
     if user_query:
         db_save_message(st.session_state.user_email, st.session_state.active_case, "user", user_query)
         with st.chat_message("user"): st.write(user_query)
         
-        prompt = f"Expert Lawyer. Respond ONLY in {target_lang}. Query: {user_query}"
+        # We instruct the AI to use the specific regional language
+        prompt = f"""
+        You are a Senior Legal Expert in Pakistan. 
+        Respond ONLY in the {target_lang} language. 
+        Use legal terminology appropriate for the Pakistan Penal Code or relevant local laws.
+        User Query: {user_query}
+        """
+        
         try:
             with st.chat_message("assistant"):
-                response = ai_engine.invoke(prompt).content
-                st.write(response)
-                db_save_message(st.session_state.user_email, st.session_state.active_case, "assistant", response)
-                play_voice_js(response, lang_code)
+                with st.spinner("⚖️ Processing..."):
+                    response = ai_engine.invoke(prompt).content
+                    st.write(response)
+                    db_save_message(st.session_state.user_email, st.session_state.active_case, "assistant", response)
+                    
+                    # Trigger Text-to-Speech
+                    play_voice_js(response, lang_code)
         except Exception as e:
-            st.error(f"Error communicating with AI: {e}")
-
+            st.error(f"AI Connection Error: {e}")
 # ==============================================================================
 # 4. MAIN
 # ==============================================================================
@@ -150,5 +174,6 @@ if not st.session_state.logged_in:
             st.rerun()
 else:
     render_chambers_page()
+
 
 
