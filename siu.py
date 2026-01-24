@@ -6,7 +6,7 @@ import time
 import pandas as pd
 import streamlit.components.v1 as components
 import json
-import rea
+import re
 from datetime import datetime
 import chromadb
 from langchain_chroma import Chroma
@@ -366,4 +366,5 @@ else:
         * Huzaifa Khan
         * Daniyal Faraz
         """)
+
 
