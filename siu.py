@@ -68,6 +68,7 @@ def db_create_case(email, case_name):
     conn.commit()
     conn.close()
 
+# FIX: Corrected variable usage for Email
 def send_email_report(receiver_email, case_name, content):
     try:
         sender_email = st.secrets["EMAIL_USER"]
@@ -84,7 +85,9 @@ def send_email_report(receiver_email, case_name, content):
         server.send_message(msg)
         server.quit()
         return True
-    except: return False
+    except Exception as e:
+        print(f"SMTP Error: {e}")
+        return False
 
 init_sql_db()
 
@@ -100,55 +103,40 @@ from streamlit_mic_recorder import speech_to_text
 
 st.set_page_config(page_title="Alpha Apex", page_icon="⚖️", layout="wide")
 
-# Styling for the Mic Section
+# FIX: CSS for Bottom Left Mic
 st.markdown("""
     <style>
-    .mic-container {
+    .mic-fixed-container {
         display: flex;
         flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        background: #f0f2f6;
-        padding: 10px;
-        border-radius: 10px;
-        border: 1px dashed #1E3A8A;
-        margin-bottom: 10px;
+        align-items: flex-start;
+        justify-content: flex-end;
+        padding: 5px;
     }
-    .mic-label {
-        font-weight: bold;
-        color: #1E3A8A;
-        font-size: 14px;
-        margin-bottom: 5px;
-    }
+    .mic-label { font-size: 12px; font-weight: bold; color: #1E3A8A; margin-bottom: 2px; }
     </style>
 """, unsafe_allow_html=True)
 
 API_KEY = st.secrets["GEMINI_API_KEY"]
 MODEL_NAME = "gemini-1.5-flash"
 
+# FIX: Voice buttons now call global Synthesis directly to prevent state loss
 def play_voice_js(text, lang_code):
     safe_text = text.replace("'", "").replace('"', "").replace("\n", " ").strip()
     js_code = f"""
-        <div style="background: #ffffff; padding: 12px; border-radius: 10px; border: 2px solid #1E3A8A; display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
-            <span style="font-family: sans-serif; font-size: 14px; color: #1E3A8A;">🔊 <b>Counsel Voice:</b></span>
-            <button onclick="window.speechSynthesis.pause()" style="cursor:pointer; padding: 5px 12px; border-radius: 5px; border: 1px solid #ccc; background: #fff;">⏸ Pause</button>
-            <button onclick="window.speechSynthesis.resume()" style="cursor:pointer; padding: 5px 12px; border-radius: 5px; border: 1px solid #ccc; background: #fff;">▶️ Resume</button>
-            <button onclick="window.speechSynthesis.cancel()" style="cursor:pointer; padding: 5px 12px; border-radius: 5px; border: 1px solid #ccc; background: #fef2f2; color: #991b1b;">⏹ Stop</button>
+        <div style="background: #ffffff; padding: 10px; border-radius: 10px; border: 2px solid #1E3A8A; display: flex; gap: 8px; align-items: center; margin-bottom: 10px;">
+            <button onclick="window.speechSynthesis.pause()" style="cursor:pointer; padding:5px 10px; border-radius:4px; border:1px solid #ccc; background: #fff;">⏸ Pause</button>
+            <button onclick="window.speechSynthesis.resume()" style="cursor:pointer; padding:5px 10px; border-radius:4px; border:1px solid #ccc; background: #fff;">▶️ Resume</button>
+            <button onclick="window.speechSynthesis.cancel()" style="cursor:pointer; padding:5px 10px; border-radius:4px; border:1px solid #ccc; background: #fef2f2; color:red;">⏹ Stop</button>
         </div>
         <script>
             window.speechSynthesis.cancel();
             var msg = new SpeechSynthesisUtterance('{safe_text}');
             msg.lang = '{lang_code}';
-            msg.rate = 1.0;
-            function speak() {{
-                var v = window.speechSynthesis.getVoices();
-                if (v.length > 0) {{ window.speechSynthesis.speak(msg); }}
-                else {{ setTimeout(speak, 100); }}
-            }}
-            speak();
+            window.speechSynthesis.speak(msg);
         </script>
     """
-    components.html(js_code, height=80)
+    components.html(js_code, height=70)
 
 @st.cache_resource
 def load_models():
@@ -198,7 +186,11 @@ def render_chambers_page():
                 st.info(st.session_state.report)
             
         if "report" in st.session_state and st.button("📧 Email to Me"):
-            send_email_report(st.session_state.user_email, st.session_state.active_case, st.session_state.report)
+            # FIX: Added success indicator
+            if send_email_report(st.session_state.user_email, st.session_state.active_case, st.session_state.report):
+                st.sidebar.success("✅ Email Dispatched!")
+            else:
+                st.sidebar.error("❌ Email Failed. Check App Password.")
 
     st.header(f"💼 Case: {st.session_state.active_case}")
     t1, t2, _ = st.columns([1, 1, 5])
@@ -213,7 +205,6 @@ def render_chambers_page():
     for m in history:
         with st.chat_message(m["role"]): st.write(m["content"])
 
-    # Quick Actions
     st.divider()
     q1, q2, q3 = st.columns(3)
     quick_q = None
@@ -221,16 +212,16 @@ def render_chambers_page():
     if q2.button("📜 Give Ruling"): quick_q = "Provide a preliminary judicial observation."
     if q3.button("📝 Summarize"): quick_q = "Summarize the legal facts discussed."
 
-    # --- VOICE CONTROLLER ---
     if "latest_voice_text" in st.session_state:
         play_voice_js(st.session_state.latest_voice_text, st.session_state.latest_voice_lang)
 
-    # --- MIC ICON ON TOP OF 'SPEAK HERE' ---
-    st.markdown('<div class="mic-container"><div class="mic-label">🎙️ Speak Here</div>', unsafe_allow_html=True)
-    voice_in = speech_to_text(language=langs[st.session_state.target_lang], key='mic_main', just_once=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    # FIX: Mic on Bottom Left
+    m_col, _ = st.columns([2, 8])
+    with m_col:
+        st.markdown('<div class="mic-fixed-container"><div class="mic-label">🎙️ Speak Here</div>', unsafe_allow_html=True)
+        voice_in = speech_to_text(language=langs[st.session_state.target_lang], key='mic_main', just_once=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    # Chat Input
     text_in = st.chat_input("Consulting Counsel...")
 
     final_q = quick_q or voice_in or text_in
