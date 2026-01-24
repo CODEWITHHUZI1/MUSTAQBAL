@@ -52,7 +52,7 @@ def apply_leviathan_shaders():
         
         /* Permanent Dark App Canvas */
         .stApp { 
-            background-color: f1f5f9 !important; 
+            background-color: #020617 !important; 
             color: #f1f5f9 !important; 
         }
 
@@ -129,7 +129,7 @@ def apply_leviathan_shaders():
 # ==============================================================================
 
 SQL_DB_FILE = "alpha_apex_leviathan_master_v31.db"
-DATA_FOLDER = "law_library_assets"
+DATA_FOLDER = "data"
 
 if not os.path.exists(DATA_FOLDER):
     os.makedirs(DATA_FOLDER)
@@ -298,7 +298,7 @@ init_leviathan_db()
 def get_analytical_engine():
     """Initializes Gemini with strictly tuned legal parameters."""
     return ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash", 
+        model="gemini-2.5-flash", 
         google_api_key=st.secrets["GOOGLE_API_KEY"], 
         temperature=0.15,
         max_output_tokens=4000
