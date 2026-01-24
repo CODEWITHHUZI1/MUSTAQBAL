@@ -17,13 +17,12 @@ from email.mime.multipart import MIMEMultipart
 # ==============================================================================
 st.set_page_config(page_title="Alpha Apex", page_icon="⚖️", layout="wide")
 
-# Session State Initialization
 if "show_audio_tools" not in st.session_state: st.session_state.show_audio_tools = False
 if "voice_speed" not in st.session_state: st.session_state.voice_speed = 1.0
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 
 API_KEY = st.secrets["GEMINI_API_KEY"]
-SQL_DB_FILE = "advocate_ai_master.db"
+SQL_DB_FILE = "advocate_ai_clean.db"
 
 def init_sql_db():
     conn = sqlite3.connect(SQL_DB_FILE)
@@ -70,7 +69,6 @@ def inject_voice_js(text, speed):
         }};
         window.pauseNow = function() {{ window.speechSynthesis.pause(); }};
         window.stopNow = function() {{ window.speechSynthesis.cancel(); }};
-        // Auto-trigger
         window.speakNow();
     </script>
     """
@@ -84,31 +82,29 @@ def render_about():
     st.markdown("""
     ### 🏛️ The Digital Advocate
     Alpha Apex is designed to bridge the gap between complex legal statutes and the people of Pakistan.
-    
-    **Core Features:**
-    * **Multilingual:** Supports Sindhi, Pashto, Balochi, Urdu, and Punjabi scripts.
-    * **Audio Intelligence:** Provides English audio summaries for technical clarity.
-    * **Legal Library:** Built-in references to the PPC and Constitution.
+    **Features:**
+    * **Multilingual:** Sindhi, Pashto, Balochi, Urdu, Punjabi.
+    * **Audio:** English audio summaries.
+    * **Library:** PPC, Constitution references.
     """)
-    st.success("System Status: Online | Model: Gemini 2.5 Flash")
 
 def render_chambers():
     langs = {"English": "en-US", "Urdu": "ur-PK", "Sindhi": "sd-PK", "Punjabi": "pa-PK", "Pashto": "ps-PK", "Balochi": "bal-PK"}
     
-    # --- SIDEBAR RESTORATION ---
+    # --- SIDEBAR (ALL FEATURES INTACT) ---
     with st.sidebar:
         st.title("⚖️ Alpha Apex")
         target_lang = st.selectbox("🌐 Language", list(langs.keys()))
         
         st.divider()
-        st.subheader("⚙️ Custom Personalization")
+        st.subheader("⚙️ Personalization")
         sys_persona = st.text_input("AI Persona:", value="You are a Pakistani Law Analyst.")
         use_irac = st.toggle("Enable IRAC Format", value=True)
         
         st.divider()
         st.subheader("📚 Legal Library")
         with st.expander("View Statutes"):
-            st.markdown("- **PPC:** Pakistan Penal Code\n- **CrPC:** Criminal Procedure Code\n- **QSO:** Qanun-e-Shahadat Order\n- **Const:** Constitution of 1973")
+            st.markdown("- **PPC:** Pakistan Penal Code\n- **CrPC:** Criminal Procedure Code\n- **QSO:** Qanun-e-Shahadat Order")
 
         st.divider()
         st.subheader("📁 Case Settings")
@@ -146,13 +142,12 @@ def render_chambers():
     for m in history:
         with st.chat_message(m["role"]): st.write(m["content"])
     
-    # Spacer to ensure chat doesn't hide behind bottom bar
     st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
 
     # --- FIXED BOTTOM BAR ---
     with st.container():
         st.divider()
-        # Audio Tools (Conditional: Only English + Toggled On)
+        # Audio Tools (Conditional)
         if st.session_state.show_audio_tools and target_lang == "English":
             ac1, ac2 = st.columns([4, 6])
             with ac1:
@@ -164,14 +159,19 @@ def render_chambers():
             with ac2:
                 st.session_state.voice_speed = st.slider("Speed", 0.5, 2.0, st.session_state.voice_speed)
 
-        # Prompt Input Bar
-        c_up, c_hp, c_txt, c_mic = st.columns([1, 1, 8, 1])
-        with c_up: st.file_uploader("Upload", label_visibility="collapsed")
+        # --- MODIFIED PROMPT BAR (3 Columns instead of 4) ---
+        c_hp, c_txt, c_mic = st.columns([1, 8, 1])
+        
+        # Column 1: Headphone
         with c_hp: 
             if st.button("🎧"): 
                 st.session_state.show_audio_tools = not st.session_state.show_audio_tools
                 st.rerun()
+        
+        # Column 2: Text Input (Wider now)
         with c_txt: text_in = st.chat_input("Ask Alpha Apex...")
+        
+        # Column 3: Mic
         with c_mic: mic_in = speech_to_text(language=langs[target_lang], key='mic', just_once=True)
 
     # --- LOGIC CORE ---
@@ -179,8 +179,7 @@ def render_chambers():
     if query:
         db_save_message(st.session_state.user_email, active_case, "user", query)
         try:
-            # Using 1.5-flash as the stable proxy for "2.5 Flash" requests
-            llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=API_KEY)
+            llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=API_KEY)
             irac = "Structure: Issue, Rule, Analysis, Conclusion." if use_irac else ""
             prompt = f"{sys_persona}\n{irac}\nRespond strictly in {target_lang} script.\n\nQuery: {query}"
             
@@ -189,9 +188,7 @@ def render_chambers():
             st.rerun()
         except Exception as e: st.error(f"Error: {e}")
 
-    # TTS Trigger (English Only)
     if history and history[-1]["role"] == "assistant" and target_lang == "English":
-        # Only inject if audio tools are enabled by the user
         if st.session_state.show_audio_tools:
             inject_voice_js(history[-1]["content"], st.session_state.voice_speed)
 
@@ -209,7 +206,6 @@ if not st.session_state.logged_in:
         conn.commit(); conn.close()
         st.rerun()
 else:
-    # Sidebar Navigation
     page = st.sidebar.radio("Navigation", ["Chambers", "About"])
     if page == "Chambers": render_chambers()
     else: render_about()
