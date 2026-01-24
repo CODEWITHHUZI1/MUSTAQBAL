@@ -12,6 +12,9 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from streamlit_mic_recorder import speech_to_text
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from google.cloud import texttospeech
+import base64
+
 
 # ==============================================================================
 # 1. INITIALIZATION & DATABASE
@@ -231,3 +234,4 @@ else:
     if page == "Chambers": render_chambers()
     elif page == "Legal Library": render_library()
     else: render_about()
+
