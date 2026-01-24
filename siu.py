@@ -29,52 +29,39 @@ from langchain_community.vectorstores import Chroma
 from streamlit_mic_recorder import speech_to_text
 from streamlit_google_auth import Authenticate
 
-# Secure way to fetch keys on deployment
+# API Key and Model Config
 API_KEY = st.secrets["GEMINI_API_KEY"]
 DATA_FOLDER = "DATA"
 DB_PATH = "./chroma_db"
 SQL_DB_FILE = "advocate_ai_v2.db"
-MODEL_NAME = "gemini-2.5-flash" 
+MODEL_NAME = "gemini-2.5-flash" # Keeping your specified model
 
 # ==============================================================================
-# 2. UI STYLING & JS
+# 2. UI STYLING & VOICE JS
 # ==============================================================================
 
-st.set_page_config(page_title="Advocate AI", page_icon="⚖️", layout="wide")
+st.set_page_config(page_title="Alpha Apex | Advocate AI", page_icon="⚖️", layout="wide")
 
 st.markdown("""
     <style>
     .main .block-container { padding-bottom: 150px; }
     .stChatMessage { border-radius: 15px; margin-bottom: 10px; border: 1px solid #eee; }
-    .mic-box {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding-top: 38px;
-    }
-    [data-testid="stMarkdownContainer"] p {
-        font-family: 'Segoe UI', 'Tahoma', sans-serif;
-        font-size: 1.1rem;
-    }
+    .mic-box { display: flex; align-items: center; justify-content: center; padding-top: 38px; }
     </style>
 """, unsafe_allow_html=True)
 
-def play_voice_js(text):
+def play_voice_js(text, lang_code):
+    """Dynamic Browser-Based Voice Synthesis"""
     safe_text = text.replace("'", "").replace('"', "").replace("\n", " ").strip()
-    is_local = bool(re.search(r'[\u0600-\u06FF]', safe_text))
     js_code = f"""
         <script>
             window.speechSynthesis.cancel();
             var msg = new SpeechSynthesisUtterance('{safe_text}');
             function setVoice() {{
                 var voices = window.speechSynthesis.getVoices();
-                if ({str(is_local).lower()}) {{
-                    msg.lang = 'ur-PK';
-                    var v = voices.find(v => v.lang.includes('ur') || v.lang.includes('hi') || v.lang.includes('sd'));
-                    if (v) msg.voice = v;
-                }} else {{
-                    msg.lang = 'en-US';
-                }}
+                msg.lang = '{lang_code}';
+                var v = voices.find(v => v.lang.startsWith('{lang_code.split("-")[0]}'));
+                if (v) msg.voice = v;
                 window.speechSynthesis.speak(msg);
             }}
             if (window.speechSynthesis.getVoices().length !== 0) {{ setVoice(); }}
@@ -89,7 +76,7 @@ def stream_text(text):
         time.sleep(0.01)
 
 # ==============================================================================
-# 3. DATABASE
+# 3. DATABASE LOGIC (SQLITE)
 # ==============================================================================
 
 def init_sql_db():
@@ -119,20 +106,6 @@ def db_get_cases(email):
     conn.close()
     return cases if cases else ["General Consultation"]
 
-def db_rename_case(email, old_name, new_name):
-    conn = sqlite3.connect(SQL_DB_FILE)
-    c = conn.cursor()
-    c.execute("UPDATE cases SET case_name = ? WHERE email = ? AND case_name = ?", (new_name, email, old_name))
-    conn.commit()
-    conn.close()
-
-def db_create_case(email, case_name):
-    conn = sqlite3.connect(SQL_DB_FILE)
-    c = conn.cursor()
-    c.execute("INSERT INTO cases (email, case_name, created_at) VALUES (?,?,?)", (email, case_name, datetime.now().strftime("%Y-%m-%d")))
-    conn.commit()
-    conn.close()
-
 def db_save_message(email, case_name, role, content):
     conn = sqlite3.connect(SQL_DB_FILE)
     c = conn.cursor()
@@ -154,7 +127,7 @@ def db_load_history(email, case_name):
 init_sql_db()
 
 # ==============================================================================
-# 4. AI & KNOWLEDGE
+# 4. AI & VECTOR SEARCH
 # ==============================================================================
 
 @st.cache_resource
@@ -183,142 +156,126 @@ if "law_db" not in st.session_state:
     st.session_state.law_db = db_inst
 
 # ==============================================================================
-# 5. AUTH
+# 5. AUTHENTICATION
 # ==============================================================================
 
-try:
-    config_dict = dict(st.secrets["google_auth"])
-    secret_data = {"web": config_dict}
-    with open('client_secret.json', 'w') as f:
-        json.dump(secret_data, f)
-    my_uri = config_dict['redirect_uris'][0]
-except KeyError:
-    st.error("Missing 'google_auth' in Streamlit Secrets!")
-    st.stop()
+config_dict = dict(st.secrets["google_auth"])
+secret_data = {"web": config_dict}
+with open('client_secret.json', 'w') as f: json.dump(secret_data, f)
 
-authenticator = Authenticate(
-    'client_secret.json', 
-    my_uri, 
-    'advocate_ai_cookie',
-    'legal_app_secret_key', 
-    30
-)
+authenticator = Authenticate('client_secret.json', config_dict['redirect_uris'][0], 'adv_cookie', 'app_secret', 30)
 
-if "logged_in" not in st.session_state: 
-    st.session_state.logged_in = False
+if "logged_in" not in st.session_state: st.session_state.logged_in = False
 
 def login_page():
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
         st.write("# ⚖️ Advocate AI")
-        with st.container(border=True):
-            t1, t2 = st.tabs(["Google", "Email"])
-            with t1: 
-                authenticator.login()
-            with t2:
-                e = st.text_input("Email")
-                if st.button("Enter"):
-                    if "@" in e:
-                        st.session_state.logged_in = True
-                        st.session_state.user_email = e
-                        st.session_state.username = e.split("@")[0].title()
-                        db_register_user(e, st.session_state.username)
-                        st.rerun()
+        authenticator.login()
 
 # ==============================================================================
-# 6. CHAMBERS PAGE (MULTILINGUAL INTEGRATED)
+# 6. CHAMBERS PAGE (TIMELINE + MULTILANG + VOICE)
 # ==============================================================================
 
 def render_chambers_page():
-    # Languages Dictionary
+    # Comprehensive Language List
     languages = {
-        "English": "English", "Sindhi": "Sindhi (Sindhi script)", "Urdu": "Urdu (Urdu script)",
-        "Punjabi": "Punjabi (Shahmukhi script)", "Pashto": "Pashto (Pashto script)",
-        "Balochi": "Balochi (Arabic script)", "Arabic": "Arabic", "Turkish": "Turkish",
-        "Chinese": "Chinese (Simplified)", "French": "French", "Spanish": "Spanish",
-        "German": "German", "Russian": "Russian", "Hindi": "Hindi (Devanagari)",
-        "Bengali": "Bengali", "Japanese": "Japanese", "Korean": "Korean", "Persian": "Farsi"
+        "English": {"script": "English", "code": "en-US"},
+        "Sindhi": {"script": "Sindhi (Sindhi script)", "code": "sd-PK"},
+        "Urdu": {"script": "Urdu (Urdu script)", "code": "ur-PK"},
+        "Punjabi": {"script": "Punjabi (Shahmukhi script)", "code": "pa-PK"},
+        "Arabic": {"script": "Arabic", "code": "ar-SA"},
+        "French": {"script": "French", "code": "fr-FR"},
+        "Spanish": {"script": "Spanish", "code": "es-ES"},
+        "Turkish": {"script": "Turkish", "code": "tr-TR"},
+        "Chinese": {"script": "Chinese (Simplified)", "code": "zh-CN"},
+        "German": {"script": "German", "code": "de-DE"},
+        "Russian": {"script": "Russian", "code": "ru-RU"},
+        "Hindi": {"script": "Hindi (Devanagari)", "code": "hi-IN"},
+        "Bengali": {"script": "Bengali", "code": "bn-BD"},
+        "Japanese": {"script": "Japanese", "code": "ja-JP"},
+        "Korean": {"script": "Korean", "code": "ko-KR"},
+        "Portuguese": {"script": "Portuguese", "code": "pt-PT"},
+        "Pashto": {"script": "Pashto", "code": "ps-PK"},
+        "Balochi": {"script": "Balochi", "code": "bal-PK"},
+        "Persian": {"script": "Persian (Farsi)", "code": "fa-IR"},
+        "Italian": {"script": "Italian", "code": "it-IT"}
     }
 
     with st.sidebar:
         st.header(f"👨‍⚖️ {st.session_state.username}")
         
-        # Multi-Language Selector
+        # 🌐 Language Settings
         st.divider()
-        target_lang = st.selectbox("🌐 AI Response Language", options=list(languages.keys()), index=0)
+        st.subheader("🌐 Language & Voice")
+        target_lang = st.selectbox("AI Response Language", options=list(languages.keys()), index=0)
         
+        # 🕒 Timeline Tool
+        st.divider()
+        st.subheader("📅 Expert Tools")
+        history = db_load_history(st.session_state.user_email, st.session_state.active_case)
+        if st.button("🕒 Extract Case Timeline"):
+            if history:
+                with st.status("Analyzing dates..."):
+                    t_prompt = f"Extract a bulleted chronological timeline of events/dates from this chat: {' '.join([m['content'] for m in history])}"
+                    timeline = ai_engine.invoke(t_prompt).content
+                st.info(timeline)
+            else: st.warning("No case history yet.")
+
+        # 📂 Case Files
         st.divider()
         cases = db_get_cases(st.session_state.user_email)
         if "active_case" not in st.session_state: st.session_state.active_case = cases[0]
-        sel = st.selectbox("Case Files", cases, index=cases.index(st.session_state.active_case))
+        sel = st.selectbox("Current Case", cases, index=cases.index(st.session_state.active_case))
         if sel != st.session_state.active_case:
             st.session_state.active_case = sel
             st.rerun()
-        
-        with st.expander("Rename Case"):
-            nt = st.text_input("New Name", value=st.session_state.active_case)
-            if st.button("Confirm"):
-                db_rename_case(st.session_state.user_email, st.session_state.active_case, nt)
-                st.session_state.active_case = nt
-                st.rerun()
-        
-        if st.button("New Case"):
-            db_create_case(st.session_state.user_email, f"Case {len(cases)+1}")
-            st.rerun()
-        
+            
         st.divider()
         if st.button("Log Out"):
             st.session_state.logged_in = False
             st.rerun()
 
-    st.title(f"⚖️ {st.session_state.active_case}")
+    st.title(f"💼 {st.session_state.active_case}")
 
-    history_container = st.container()
-    with history_container:
-        history = db_load_history(st.session_state.user_email, st.session_state.active_case)
+    # Chat UI
+    h_cont = st.container()
+    with h_cont:
         for msg in history:
             with st.chat_message(msg["role"]): st.markdown(msg["content"])
 
-    input_placeholder = st.container()
-    with input_placeholder:
-        c_text, c_mic = st.columns([10, 1])
-        with c_text:
-            text_in = st.chat_input(f"Ask in {target_lang}...")
-        with c_mic:
-            st.markdown('<div class="mic-box">', unsafe_allow_html=True)
-            voice_in = speech_to_text(language='en-US', start_prompt="🎤", stop_prompt="⏹️", key='mic_chambers', just_once=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+    # Input logic
+    c_text, c_mic = st.columns([10, 1])
+    with c_text: text_in = st.chat_input(f"Consult Alpha Apex in {target_lang}...")
+    with c_mic:
+        st.markdown('<div class="mic-box">', unsafe_allow_html=True)
+        voice_in = speech_to_text(language=languages[target_lang]["code"], start_prompt="🎤", stop_prompt="⏹️", key='mic', just_once=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     final_in = voice_in if voice_in else text_in
-    is_v = True if voice_in else False
-
     if final_in:
         db_save_message(st.session_state.user_email, st.session_state.active_case, "user", final_in)
-        with history_container:
+        with h_cont:
             with st.chat_message("user"): st.markdown(final_in)
             with st.chat_message("assistant"):
-                p, res = st.empty(), ""
-                ctx = ""
+                p, res, ctx = st.empty(), "", ""
                 if st.session_state.law_db:
-                    docs = st.session_state.law_db.as_retriever(search_kwargs={"k": 4}).invoke(final_in)
+                    docs = st.session_state.law_db.as_retriever(search_kwargs={"k": 3}).invoke(final_in)
                     ctx = "\n\n".join([d.page_content for d in docs])
                 
-                # Dynamic Instruction based on sidebar choice
-                chosen_script = languages[target_lang]
-                prompt = f"You are a Senior Legal Expert Sindh Law. You MUST respond ONLY in {chosen_script}. Ensure legal accuracy.\nContext: {ctx}\nUser: {final_in}"
+                lang_cfg = languages[target_lang]
+                prompt = f"You are a Senior Legal Expert. Respond ONLY in {lang_cfg['script']}.\nContext: {ctx}\nUser: {final_in}"
                 
-                try:
-                    ai_out = ai_engine.invoke(prompt).content
-                    for chunk in stream_text(ai_out):
-                        res += chunk
-                        p.markdown(res + "▌")
-                    p.markdown(res)
-                    db_save_message(st.session_state.user_email, st.session_state.active_case, "assistant", res)
-                    if is_v: play_voice_js(res)
-                except Exception as e: st.error(f"Error: {e}")
+                ai_out = ai_engine.invoke(prompt).content
+                for chunk in stream_text(ai_out):
+                    res += chunk
+                    p.markdown(res + "▌")
+                p.markdown(res)
+                db_save_message(st.session_state.user_email, st.session_state.active_case, "assistant", res)
+                play_voice_js(res, lang_cfg["code"])
 
 # ==============================================================================
-# 7. MAIN EXECUTION
+# 7. MAIN APP
 # ==============================================================================
 
 if st.session_state.get('connected'):
@@ -334,26 +291,12 @@ if not st.session_state.get('logged_in'):
     login_page()
 else:
     with st.sidebar:
-        st.markdown("---")
-        nav = st.radio("Navigate", ["🏢 Chambers", "📚 Library", "ℹ️ Team"], label_visibility="collapsed")
+        nav = st.radio("Menu", ["🏢 Chambers", "📚 Library", "ℹ️ Team"])
     
-    if nav == "🏢 Chambers":
-        render_chambers_page()
+    if nav == "🏢 Chambers": render_chambers_page()
     elif nav == "📚 Library":
-        st.title("📚 Legal Library")
-        f_list = glob.glob(f"{DATA_FOLDER}/*.pdf")
-        if f_list:
-            st.table([{"Document": os.path.basename(f), "Status": "✅ Indexed"} for f in f_list])
-        else:
-            st.warning("No legal documents found in DATA folder.")
+        st.title("📚 Law Library")
+        st.table([{"Doc": os.path.basename(f), "Status": "Ready"} for f in glob.glob(f"{DATA_FOLDER}/*.pdf")])
     else:
-        st.title("ℹ️ Development Team")
-        st.info("Advocate AI - Alpha Apex")
-        st.markdown("""
-        **Project Contributors:**
-        * Saim Ahmed
-        * Mustafa Khan
-        * Ibrahim Sohail
-        * Huzaifa Khan
-        * Daniyal Faraz
-        """)
+        st.title("ℹ️ Alpha Apex Team")
+        st.info("Saim, Mustafa, Ibrahim, Huzaifa, Daniyal")
