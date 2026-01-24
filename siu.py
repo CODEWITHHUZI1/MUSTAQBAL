@@ -6,7 +6,6 @@ import streamlit as st
 import sqlite3
 import datetime
 import smtplib
-import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import streamlit.components.v1 as components
@@ -84,7 +83,6 @@ def load_llm():
         model="gemini-1.5-flash", 
         google_api_key=API_KEY, 
         temperature=0.3,
-        max_retries=3,
         safety_settings={
             "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
             "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
@@ -115,7 +113,18 @@ def render_chambers():
         st.title("⚖️ Alpha Apex")
         target_lang = st.selectbox("🌐 Language", list(langs.keys()))
         lang_code = langs[target_lang]
-        
+
+        # --- SYSTEM CONFIGURATION SECTION ---
+        st.divider()
+        st.subheader("⚙️ System Configuration")
+        with st.expander("Configure AI Behavior", expanded=False):
+            sys_persona = st.text_area("AI Persona/Role:", 
+                value="Senior Legal Counsel specializing in Pakistani Civil and Criminal Law.")
+            sys_behavior = st.text_area("Behavior Rules:", 
+                value="Always cite relevant sections of the PPC (Pakistan Penal Code) or CrPC. Maintain a professional, neutral, and cautious tone.")
+            sys_response_format = st.selectbox("Response Style:", 
+                ["Bullet Points", "Detailed Paragraphs", "Step-by-Step Guide", "Concise Summary"])
+
         st.divider()
         st.subheader("📁 Case Management")
         
@@ -135,14 +144,6 @@ def render_chambers():
                 conn.commit(); conn.close()
                 st.rerun()
 
-        rename_to = st.text_input("Rename Current Case to:")
-        if st.button("✏️ Rename Case"):
-            if rename_to and active_case:
-                conn = sqlite3.connect(SQL_DB_FILE)
-                conn.execute("UPDATE cases SET case_name=? WHERE email=? AND case_name=?", (rename_to, st.session_state.user_email, active_case))
-                conn.commit(); conn.close()
-                st.rerun()
-
         if st.button("🗑️ Delete Current Case"):
             conn = sqlite3.connect(SQL_DB_FILE)
             conn.execute("DELETE FROM cases WHERE email=? AND case_name=?", (st.session_state.user_email, active_case))
@@ -156,30 +157,34 @@ def render_chambers():
                 st.success("Sent!")
 
     st.header(f"💼 Chambers: {st.session_state.active_case}")
-    c1, c2, c3 = st.columns(3)
-    quick_q = None
-    if c1.button("🧠 Infer Legal Path"): quick_q = "What is the recommended legal path?"
-    if c2.button("📜 Give Ruling"): quick_q = "Give a preliminary observation."
-    if c3.button("📝 Summarize"): quick_q = "Summarize the case history."
-    st.divider()
-
+    
+    # History
     history = db_load_history(st.session_state.user_email, st.session_state.active_case)
     for m in history:
         with st.chat_message(m["role"]): st.write(m["content"])
 
+    # Inputs
     m_col, i_col = st.columns([1, 8])
     with m_col: voice_in = speech_to_text(language=lang_code, key='mic', just_once=True)
     with i_col: text_in = st.chat_input("Consult Alpha Apex...")
 
-    query = quick_q or voice_in or text_in
+    query = voice_in or text_in
     if query:
         db_save_message(st.session_state.user_email, st.session_state.active_case, "user", query)
         with st.chat_message("user"): st.write(query)
         
         with st.chat_message("assistant"):
             try:
-                prompt = f"Expert Lawyer. Respond in {target_lang}. Query: {query}"
-                response = load_llm().invoke(prompt).content
+                # Constructing the system prompt based on your new configuration
+                full_context = f"""
+                You are {sys_persona}. 
+                Follow these behavior rules: {sys_behavior}. 
+                Provide the final response formatted as a {sys_response_format}.
+                Respond in {target_lang}.
+                """
+                
+                response = load_llm().invoke(f"{full_context}\n\nUser Question: {query}").content
+                
                 st.write(response)
                 db_save_message(st.session_state.user_email, st.session_state.active_case, "assistant", response)
                 play_voice_js(response, lang_code)
@@ -193,19 +198,6 @@ def render_library():
 
 def render_about():
     st.header("ℹ️ About Alpha Apex")
-    
-    st.markdown("""
-    ### 🤖 The Chatbot
-    **Alpha Apex** is a specialized Legal AI Assistant designed for the Pakistani legal landscape. 
-    It leverages advanced Large Language Models to provide instant preliminary legal observations, 
-    summarize complex case facts, and offer procedural guidance based on the **Pakistan Penal Code (PPC)** and the **Constitution of Pakistan**. Available in multiple regional languages including Urdu, Sindhi, 
-    Punjabi, Pashto, and Balochi.
-    
-    ---
-    ### 👥 Our Team
-    Meet the developers and legal tech enthusiasts behind Alpha Apex:
-    """)
-
     team = [
         {"Name": "Saim Ahmed", "Contact": "03700297696", "Email": "saimahmed.work733@gmail.com"},
         {"Name": "Huzaifa Khan", "Contact": "03102526567", "Email": "m.huzaifa.khan471@gmail.com"},
@@ -213,7 +205,6 @@ def render_about():
         {"Name": "Ibrahim Sohail", "Contact": "03212046403", "Email": "ibrahimsohailkhan10@gmail.com"},
         {"Name": "Daniyal Faraz", "Contact": "03333502530", "Email": "daniyalfarazkhan2012@gmail.com"},
     ]
-
     st.table(team)
 
 # ==============================================================================
