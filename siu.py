@@ -1,16 +1,113 @@
+ Conversation opened. 1 unread message.
+
+Skip to content
+Using Gmail with screen readers
+1 of 146
+(no subject)
+Inbox
+
+Muhammad Mustafa Khan - 88
+12:39 PM (0 minutes ago)
+to me
+
 import streamlit as st
+import os
 import sqlite3
-import smtplib
-from datetime import datetime
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import glob
+import time
+import pandas as pd
 import streamlit.components.v1 as components
+import json
+import re
+from datetime import datetime
+import chromadb
+from langchain_chroma import Chroma
+# ==============================================================================
+# 1. SYSTEM CONFIGURATION
+# ==============================================================================
+
+try:
+    __import__('pysqlite3')
+    import sys
+    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+except ImportError:
+    pass
+
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import Chroma
+from streamlit_mic_recorder import speech_to_text
+from streamlit_google_auth import Authenticate
+
+# Secure way to fetch keys on deployment
+API_KEY = st.secrets["GOOGLE_API_KEY"]
+DATA_FOLDER = "data"
+DB_PATH = "./chroma_db"
+SQL_DB_FILE = "advocate_ai_v2.db"
+MODEL_NAME = "gemini-2.5-flash"
 
 # ==============================================================================
-# 1. DATABASE & UTILITY FUNCTIONS
+# 2. UI STYLING & JS
 # ==============================================================================
 
-SQL_DB_FILE = "advocate_ai_v3.db"
+st.set_page_config(page_title="Advocate AI", page_icon="⚖️", layout="wide")
+
+st.markdown("""
+    <style>
+    /* Ensure the main container has enough bottom padding so input doesn't cover text */
+    .main .block-container { padding-bottom: 150px; }
+   
+    .stChatMessage { border-radius: 15px; margin-bottom: 10px; border: 1px solid #eee; }
+   
+    /* Mic Alignment Fix */
+    .mic-box {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding-top: 38px;
+    }
+   
+    /* Urdu Font */
+    [data-testid="stMarkdownContainer"] p {
+        font-family: 'Segoe UI', 'Tahoma', sans-serif;
+        font-size: 1.1rem;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+def play_voice_js(text):
+    safe_text = text.replace("'", "").replace('"', "").replace("\n", " ").strip()
+    is_urdu = bool(re.search(r'[\u0600-\u06FF]', safe_text))
+    js_code = f"""
+        <script>
+            window.speechSynthesis.cancel();
+            var msg = new SpeechSynthesisUtterance('{safe_text}');
+            function setVoice() {{
+                var voices = window.speechSynthesis.getVoices();
+                if ({str(is_urdu).lower()}) {{
+                    msg.lang = 'ur-PK';
+                    var v = voices.find(v => v.lang.includes('ur') || v.lang.includes('hi'));
+                    if (v) msg.voice = v;
+                }} else {{
+                    msg.lang = 'en-US';
+                }}
+                window.speechSynthesis.speak(msg);
+            }}
+            if (window.speechSynthesis.getVoices().length !== 0) {{ setVoice(); }}
+            else {{ window.speechSynthesis.onvoiceschanged = setVoice; }}
+        </script>
+    """
+    components.html(js_code, height=0)
+
+def stream_text(text):
+    for word in text.split(" "):
+        yield word + " "
+        time.sleep(0.01)
+
+# ==============================================================================
+# 3. DATABASE
+# ==============================================================================
 
 def init_sql_db():
     conn = sqlite3.connect(SQL_DB_FILE)
@@ -31,13 +128,27 @@ def db_register_user(email, username):
     conn.commit()
     conn.close()
 
-def db_load_history(email, case_name):
+def db_get_cases(email):
     conn = sqlite3.connect(SQL_DB_FILE)
     c = conn.cursor()
-    c.execute("SELECT role, content FROM history JOIN cases ON history.case_id = cases.id WHERE cases.email=? AND cases.case_name=? ORDER BY history.id ASC", (email, case_name))
-    data = [{"role": r, "content": t} for r, t in c.fetchall()]
+    c.execute("SELECT case_name FROM cases WHERE email=? ORDER BY id DESC", (email,))
+    cases = [row[0] for row in c.fetchall()]
     conn.close()
-    return data
+    return cases if cases else ["General Consultation"]
+
+def db_rename_case(email, old_name, new_name):
+    conn = sqlite3.connect(SQL_DB_FILE)
+    c = conn.cursor()
+    c.execute("UPDATE cases SET case_name = ? WHERE email = ? AND case_name = ?", (new_name, email, old_name))
+    conn.commit()
+    conn.close()
+
+def db_create_case(email, case_name):
+    conn = sqlite3.connect(SQL_DB_FILE)
+    c = conn.cursor()
+    c.execute("INSERT INTO cases (email, case_name, created_at) VALUES (?,?,?)", (email, case_name, datetime.now().strftime("%Y-%m-%d")))
+    conn.commit()
+    conn.close()
 
 def db_save_message(email, case_name, role, content):
     conn = sqlite3.connect(SQL_DB_FILE)
@@ -49,182 +160,228 @@ def db_save_message(email, case_name, role, content):
     conn.commit()
     conn.close()
 
-def db_get_cases(email):
+def db_load_history(email, case_name):
     conn = sqlite3.connect(SQL_DB_FILE)
     c = conn.cursor()
-    c.execute("SELECT case_name FROM cases WHERE email=? ORDER BY id DESC", (email,))
-    rows = c.fetchall()
+    c.execute("SELECT role, content FROM history JOIN cases ON history.case_id = cases.id WHERE cases.email=? AND cases.case_name=? ORDER BY history.id ASC", (email, case_name))
+    data = [{"role": r, "content": t} for r, t in c.fetchall()]
     conn.close()
-    return [row[0] for row in rows] if rows else ["General Consultation"]
-
-def db_create_case(email, case_name):
-    conn = sqlite3.connect(SQL_DB_FILE)
-    c = conn.cursor()
-    c.execute("INSERT INTO cases (email, case_name, created_at) VALUES (?,?,?)", (email, case_name, datetime.now().strftime("%Y-%m-%d")))
-    conn.commit()
-    conn.close()
-
-def send_email_report(receiver_email, case_name, content):
-    try:
-        sender_email = st.secrets["EMAIL_USER"]
-        sender_password = st.secrets["EMAIL_PASS"]
-        msg = MIMEMultipart()
-        msg['From'] = f"Alpha Apex Legal <{sender_email}>"
-        msg['To'] = receiver_email
-        msg['Subject'] = f"Legal Analysis: {case_name}"
-        body = f"Respected Counsel,\n\nAlpha Apex has generated a report for '{case_name}':\n\n{content}\n\nRegards,\nAlpha Apex Team"
-        msg.attach(MIMEText(body, 'plain'))
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(sender_email, sender_password)
-        server.send_message(msg)
-        server.quit()
-        return True
-    except:
-        return False
+    return data
 
 init_sql_db()
 
 # ==============================================================================
-# 2. AI & VOICE CONTROLLER
+# 4. AI & KNOWLEDGE
 # ==============================================================================
-
-from langchain_google_genai import ChatGoogleGenerativeAI
-from streamlit_mic_recorder import speech_to_text
-
-st.set_page_config(page_title="Alpha Apex", page_icon="⚖️", layout="wide")
-
-st.markdown("""
-    <style>
-    .mic-fixed-container { display: flex; flex-direction: column; align-items: flex-start; padding: 5px; }
-    .mic-label { font-size: 12px; font-weight: bold; color: #1E3A8A; margin-bottom: 2px; }
-    </style>
-""", unsafe_allow_html=True)
-
-# LOAD SECRETS
-API_KEY = st.secrets["GEMINI_API_KEY"]
-
-def play_voice_js(text, lang_code):
-    safe_text = text.replace("'", "").replace('"', "").replace("\n", " ").strip()
-    js_code = f"""
-        <div style="background: #ffffff; padding: 10px; border-radius: 10px; border: 2px solid #1E3A8A; display: flex; gap: 8px; align-items: center; margin-bottom: 10px;">
-            <button onclick="window.speechSynthesis.pause()" style="cursor:pointer; padding:5px 10px; border:1px solid #ccc; background: #fff;">⏸ Pause</button>
-            <button onclick="window.speechSynthesis.resume()" style="cursor:pointer; padding:5px 10px; border:1px solid #ccc; background: #fff;">▶️ Resume</button>
-            <button onclick="window.speechSynthesis.cancel()" style="cursor:pointer; padding:5px 10px; border:1px solid #ccc; background: #fef2f2; color:red;">⏹ Stop</button>
-        </div>
-        <script>
-            window.speechSynthesis.cancel();
-            var msg = new SpeechSynthesisUtterance('{safe_text}');
-            msg.lang = '{lang_code}';
-            window.speechSynthesis.speak(msg);
-        </script>
-    """
-    components.html(js_code, height=70)
 
 @st.cache_resource
 def load_models():
-    # RELAXED SAFETY SETTINGS TO AVOID BLOCKED RESPONSES
-    return ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
-        google_api_key=API_KEY,
-        temperature=0.2,
-        safety_settings={
-            "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
-            "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
-            "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE",
-            "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE",
-        }
-    )
+    llm = ChatGoogleGenerativeAI(model=MODEL_NAME, temperature=0.3, google_api_key=API_KEY)
+    embed = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=API_KEY)
+    return llm, embed
 
-ai_engine = load_models()
+ai_engine, vector_embedder = load_models()
+
+def sync_knowledge_base():
+    if not os.path.exists(DATA_FOLDER): os.makedirs(DATA_FOLDER)
+    pdfs = glob.glob(f"{DATA_FOLDER}/*.pdf")
+    if not pdfs: return None, "No PDFs."
+    if os.path.exists(DB_PATH):
+        return Chroma(persist_directory=DB_PATH, embedding_function=vector_embedder), "Connected."
+    else:
+        chunks = []
+        for p in pdfs:
+            loader = PyPDFLoader(p)
+            chunks.extend(loader.load_and_split(RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=200)))
+        return Chroma.from_documents(chunks, vector_embedder, persist_directory=DB_PATH), "Indexed."
+
+if "law_db" not in st.session_state:
+    db_inst, _ = sync_knowledge_base()
+    st.session_state.law_db = db_inst
 
 # ==============================================================================
-# 3. CHAMBERS UI
+# 5. AUTH
+# ==============================================================================
+
+# 1. Create the physical file on the server from secrets
+try:
+    config_dict = dict(st.secrets["google_auth"])
+    # Wrap in "web" as required by the underlying Google library
+    secret_data = {"web": config_dict}
+   
+    with open('client_secret.json', 'w') as f:
+        json.dump(secret_data, f)
+       
+    my_uri = config_dict['redirect_uris'][0]
+except KeyError:
+    st.error("Missing 'google_auth' in Streamlit Secrets!")
+    st.stop()
+
+# 2. Positional Arguments: (path, uri, cookie_name, key, expiry)
+# This format avoids "unexpected keyword argument" errors
+authenticator = Authenticate(
+    'client_secret.json',
+    my_uri,
+    'advocate_ai_cookie',
+    'legal_app_secret_key',
+    30
+)
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+def login_page():
+    c1, c2, c3 = st.columns([1, 2, 1])
+    with c2:
+        st.write("# ⚖️ Advocate AI")
+        with st.container(border=True):
+            t1, t2 = st.tabs(["Google", "Email"])
+            with t1:
+                authenticator.login()
+            with t2:
+                e = st.text_input("Email")
+                if st.button("Enter"):
+                    if "@" in e:
+                        st.session_state.logged_in = True
+                        st.session_state.user_email = e
+                        st.session_state.username = e.split("@")[0].title()
+                        db_register_user(e, st.session_state.username)
+                        st.rerun()
+# ==============================================================================
+# 6. CHAMBERS PAGE (FIXED LAYOUT)
 # ==============================================================================
 
 def render_chambers_page():
-    cases = db_get_cases(st.session_state.user_email)
-    if "active_case" not in st.session_state: st.session_state.active_case = cases[0]
-    if "target_lang" not in st.session_state: st.session_state.target_lang = "English"
-
-    langs = {
-        "English": "en-US", "Urdu": "ur-PK", "Sindhi": "sd-PK", "Punjabi": "pa-PK",
-        "Pashto": "ps-PK", "Arabic": "ar-SA", "French": "fr-FR", "Spanish": "es-ES",
-        "German": "de-DE", "Chinese": "zh-CN", "Japanese": "ja-JP", "Russian": "ru-RU",
-        "Hindi": "hi-IN", "Bengali": "bn-BD", "Portuguese": "pt-PT", "Italian": "it-IT",
-        "Turkish": "tr-TR", "Korean": "ko-KR", "Persian": "fa-IR", "Marathi": "mr-IN"
-    }
-
+    # 1. Sidebar Logic
     with st.sidebar:
-        st.title("👨‍⚖️ Alpha Apex")
-        st.session_state.target_lang = st.selectbox("🌐 Language", list(langs.keys()), index=list(langs.keys()).index(st.session_state.target_lang))
-        st.divider()
-        sel = st.selectbox("Switch Case", cases, index=cases.index(st.session_state.active_case))
+        st.header(f"👨‍⚖️ {st.session_state.username}")
+        cases = db_get_cases(st.session_state.user_email)
+        if "active_case" not in st.session_state: st.session_state.active_case = cases[0]
+        sel = st.selectbox("Case Files", cases, index=cases.index(st.session_state.active_case))
         if sel != st.session_state.active_case:
             st.session_state.active_case = sel
             st.rerun()
-        if st.button("➕ New Case"):
-            db_create_case(st.session_state.user_email, f"Consultation {len(cases)+1}")
+       
+        with st.expander("Rename Case"):
+            nt = st.text_input("New Name", value=st.session_state.active_case)
+            if st.button("Confirm"):
+                db_rename_case(st.session_state.user_email, st.session_state.active_case, nt)
+                st.session_state.active_case = nt
+                st.rerun()
+       
+        if st.button("New Case"):
+            db_create_case(st.session_state.user_email, f"Case {len(cases)+1}")
             st.rerun()
+       
         st.divider()
+        if st.button("Log Out"):
+            st.session_state.logged_in = False
+            st.rerun()
+
+    st.title(f"⚖️ {st.session_state.active_case}")
+
+    # 2. Chat History Block (ALWAYS ABOVE INPUT)
+    history_container = st.container()
+    with history_container:
         history = db_load_history(st.session_state.user_email, st.session_state.active_case)
-        if st.button("🕒 Extract Timeline"):
-            if history:
-                st.session_state.report = ai_engine.invoke(f"Extract timeline from: {history}").content
-                st.info(st.session_state.report)
-        if "report" in st.session_state and st.button("📧 Email to Me"):
-            if send_email_report(st.session_state.user_email, st.session_state.active_case, st.session_state.report):
-                st.sidebar.success("✅ Email Sent!")
-            else: st.sidebar.error("❌ Email Failed.")
+        for msg in history:
+            with st.chat_message(msg["role"]): st.markdown(msg["content"])
 
-    st.header(f"💼 Case: {st.session_state.active_case}")
-    t1, t2, _ = st.columns([1, 1, 5])
-    if t1.button("🇺🇸 English"): st.session_state.target_lang = "English"; st.rerun()
-    if t2.button("🇵🇰 Urdu"): st.session_state.target_lang = "Urdu"; st.rerun()
+    # 3. Input Tools Block (STAYS AT THE BOTTOM)
+    input_placeholder = st.container()
+    with input_placeholder:
+        c_text, c_mic = st.columns([10, 1])
+        with c_text:
+            text_in = st.chat_input("Ask Sindh Law / قانونی سوال...")
+        with c_mic:
+            st.markdown('<div class="mic-box">', unsafe_allow_html=True)
+            voice_in = speech_to_text(language='ur-PK', start_prompt="🎤", stop_prompt="⏹️", key='mic_chambers', just_once=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
-    for m in history:
-        with st.chat_message(m["role"]): st.write(m["content"])
+    # 4. Logic Handling
+    final_in = voice_in if voice_in else text_in
+    is_v = True if voice_in else False
 
-    st.divider()
-    q1, q2, q3 = st.columns(3)
-    quick_q = None
-    if q1.button("🧠 Infer Path"): quick_q = "What is the recommended legal path?"
-    if q2.button("📜 Give Ruling"): quick_q = "Provide a preliminary judicial observation."
-    if q3.button("📝 Summarize"): quick_q = "Summarize the legal facts."
+    if final_in:
+        db_save_message(st.session_state.user_email, st.session_state.active_case, "user", final_in)
+        # Append immediately to history container
+        with history_container:
+            with st.chat_message("user"): st.markdown(final_in)
+            with st.chat_message("assistant"):
+                p, res = st.empty(), ""
+                ctx = ""
+                if st.session_state.law_db:
+                    docs = st.session_state.law_db.as_retriever(search_kwargs={"k": 4}).invoke(final_in)
+                    ctx = "\n\n".join([d.page_content for d in docs])
+               
+                prompt = f"Senior Legal Expert Sindh Law. Use same language as user (Urdu script or English).\nContext: {ctx}\nUser: {final_in}"
+               
+                try:
+                    ai_out = ai_engine.invoke(prompt).content
+                    for chunk in stream_text(ai_out):
+                        res += chunk
+                        p.markdown(res + "▌")
+                    p.markdown(res)
+                    db_save_message(st.session_state.user_email, st.session_state.active_case, "assistant", res)
+                    if is_v: play_voice_js(res)
+                except Exception as e: st.error(f"Error: {e}")
 
-    if "latest_voice_text" in st.session_state:
-        play_voice_js(st.session_state.latest_voice_text, st.session_state.latest_voice_lang)
+# ==============================================================================
+# 7. MAIN
+# ==============================================================================
 
-    # MIC ON BOTTOM LEFT (As requested)
-    m_col, _ = st.columns([2, 8])
-    with m_col:
-        st.markdown('<div class="mic-fixed-container"><div class="mic-label">🎙️ Speak Here</div>', unsafe_allow_html=True)
-        voice_in = speech_to_text(language=langs[st.session_state.target_lang], key='mic_main', just_once=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+# ==============================================================================
+# 7. MAIN EXECUTION FLOW (FIXED LOGIN & SESSION SYNC)
+# ==============================================================================
 
-    text_in = st.chat_input("Consulting Counsel...")
-
-    final_q = quick_q or voice_in or text_in
-    if final_q:
-        db_save_message(st.session_state.user_email, st.session_state.active_case, "user", final_q)
-        prompt = f"You are a professional legal expert. Respond ONLY in {st.session_state.target_lang}. User: {final_q}"
-        try:
-            ans = ai_engine.invoke(prompt).content
-            db_save_message(st.session_state.user_email, st.session_state.active_case, "assistant", ans)
-            st.session_state.latest_voice_text = ans
-            st.session_state.latest_voice_lang = langs[st.session_state.target_lang]
-        except Exception as e:
-            st.error("The AI Service is currently unavailable. Please check your internet or API Key.")
+# Step 1: Handle Google Handshake immediately
+if st.session_state.get('connected'):
+    # Check if we haven't synced the Google info to our local session yet
+    if not st.session_state.get('logged_in'):
+        user_info = st.session_state.get('user_info', {})
+        st.session_state.user_email = user_info.get('email')
+        st.session_state.username = user_info.get('name', "Lawyer")
+        st.session_state.logged_in = True
+       
+        # Register in SQLite database
+        db_register_user(st.session_state.user_email, st.session_state.username)
+       
+        # FORCE RERUN: This breaks the loop and moves the script to the 'else' block
         st.rerun()
 
-if "logged_in" not in st.session_state: st.session_state.logged_in = False
-if not st.session_state.logged_in:
-    st.title("⚖️ Alpha Apex AI")
-    email = st.text_input("Enter Email")
-    if st.button("Login"):
-        if "@" in email:
-            st.session_state.logged_in = True
-            st.session_state.user_email = email
-            db_register_user(email, email.split("@")[0].capitalize())
-            st.rerun()
-else: render_chambers_page()
+# Step 2: Determine which page to show based on finalized state
+if not st.session_state.get('logged_in'):
+    login_page()
+else:
+    # Sidebar navigation for logged-in users
+    with st.sidebar:
+        st.markdown("---")
+        nav = st.radio("Navigate", ["🏢 Chambers", "📚 Library", "ℹ️ Team"], label_visibility="collapsed")
+   
+    if nav == "🏢 Chambers":
+        render_chambers_page()
+    elif nav == "📚 Library":
+        st.title("📚 Legal Library")
+        f_list = glob.glob(f"{DATA_FOLDER}/*.pdf")
+        if f_list:
+            st.table([{"Document": os.path.basename(f), "Status": "✅ Indexed"} for f in f_list])
+        else:
+            st.warning("No legal documents found in DATA folder.")
+    else:
+        st.title("ℹ️ Development Team")
+        st.info("Advocate AI - Sindh Legal Intelligence System")
+        st.markdown("""
+        **Project Contributors:**
+        * Saim Ahmed
+        * Mustafa Khan
+        * Ibrahim Sohail
+        * Huzaifa Khan
+        * Daniyal Faraz
+
+        """)
+Compose:
+app.py requirement.txt
+MinimizePop-outClose
+ibrahimsohailkhan10@gmail.com
+app.py requirement.txt
+
