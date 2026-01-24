@@ -51,7 +51,7 @@ def db_load_history(email, case_name):
 init_sql_db()
 
 # ==============================================================================
-# 2. CORE UTILITIES (EMAIL, TTS, LLM)
+# 2. CORE UTILITIES
 # ==============================================================================
 def send_email_report(receiver_email, case_name, history):
     try:
@@ -80,9 +80,8 @@ def send_email_report(receiver_email, case_name, history):
 
 @st.cache_resource
 def load_llm():
-    # Fix for ChatGoogleGenerativeAIError: Removing safety blocks for legal context
     return ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash", 
+        model="gemini-1.5-flash", 
         google_api_key=API_KEY, 
         temperature=0.3,
         max_retries=3,
@@ -117,19 +116,49 @@ def render_chambers():
         target_lang = st.selectbox("🌐 Language", list(langs.keys()))
         lang_code = langs[target_lang]
         
+        st.divider()
+        st.subheader("📁 Case Management")
+        
         conn = sqlite3.connect(SQL_DB_FILE)
         cases = [r[0] for r in conn.execute("SELECT case_name FROM cases WHERE email=?", (st.session_state.user_email,)).fetchall()]
         conn.close()
         
         if not cases: cases = ["General Consultation"]
-        st.session_state.active_case = st.selectbox("📁 Case File", cases)
-        
-        if st.button("📧 Email Conversation"):
+        active_case = st.selectbox("Select Case", cases)
+        st.session_state.active_case = active_case
+
+        # NEW CASE
+        new_case_name = st.text_input("New Case Name")
+        if st.button("➕ Create New Case"):
+            if new_case_name:
+                conn = sqlite3.connect(SQL_DB_FILE)
+                conn.execute("INSERT INTO cases (email, case_name, created_at) VALUES (?,?,?)", (st.session_state.user_email, new_case_name, str(datetime.date.today())))
+                conn.commit(); conn.close()
+                st.rerun()
+
+        # RENAME CASE
+        rename_to = st.text_input("Rename Current Case to:")
+        if st.button("✏️ Rename Case"):
+            if rename_to and active_case:
+                conn = sqlite3.connect(SQL_DB_FILE)
+                conn.execute("UPDATE cases SET case_name=? WHERE email=? AND case_name=?", (rename_to, st.session_state.user_email, active_case))
+                conn.commit(); conn.close()
+                st.rerun()
+
+        # DELETE CASE
+        if st.button("🗑️ Delete Current Case"):
+            conn = sqlite3.connect(SQL_DB_FILE)
+            conn.execute("DELETE FROM cases WHERE email=? AND case_name=?", (st.session_state.user_email, active_case))
+            conn.commit(); conn.close()
+            st.rerun()
+
+        st.divider()
+        if st.button("📧 Email Chat History"):
             hist = db_load_history(st.session_state.user_email, st.session_state.active_case)
             if send_email_report(st.session_state.user_email, st.session_state.active_case, hist):
-                st.success("Sent to Email!")
+                st.success("Sent!")
 
-    # --- QUICK ACTIONS ON TOP ---
+    # --- QUICK ACTIONS ---
     st.header(f"💼 Chambers: {st.session_state.active_case}")
     c1, c2, c3 = st.columns(3)
     quick_q = None
@@ -138,11 +167,12 @@ def render_chambers():
     if c3.button("📝 Summarize"): quick_q = "Summarize the case history."
     st.divider()
 
-    # Chat
+    # Chat Display
     history = db_load_history(st.session_state.user_email, st.session_state.active_case)
     for m in history:
         with st.chat_message(m["role"]): st.write(m["content"])
 
+    # Inputs
     m_col, i_col = st.columns([1, 8])
     with m_col: voice_in = speech_to_text(language=lang_code, key='mic', just_once=True)
     with i_col: text_in = st.chat_input("Consult Alpha Apex...")
@@ -162,19 +192,18 @@ def render_chambers():
                     play_voice_js(response, lang_code)
                     st.rerun()
                 except Exception as e:
-                    st.error(f"System Overload: {e}")
+                    st.error(f"Error: {e}")
 
 def render_library():
     st.header("📚 Legal Library")
-    st.info("Pakistan Penal Code & Constitution")
-    st.write("Browse legal documents here.")
+    st.info("Browse Pakistan Penal Code (PPC) and Constitution.")
 
 def render_about():
     st.header("ℹ️ About")
     st.write("Alpha Apex: AI Justice Platform for Pakistan.")
 
 # ==============================================================================
-# 4. MAIN NAVIGATION
+# 4. MAIN FLOW
 # ==============================================================================
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 
@@ -186,13 +215,12 @@ if not st.session_state.logged_in:
             st.session_state.logged_in = True
             st.session_state.user_email = email
             conn = sqlite3.connect(SQL_DB_FILE)
+            conn.execute("INSERT OR IGNORE INTO users (email, username, joined_date) VALUES (?,?,?)", (email, email.split("@")[0], "2026-01-24"))
             conn.execute("INSERT OR IGNORE INTO cases (email, case_name, created_at) VALUES (?,?,?)", (email, "General Consultation", "2026-01-24"))
             conn.commit(); conn.close()
             st.rerun()
 else:
-    # Sidebar Page Selector
     page = st.sidebar.radio("Navigation", ["Chambers", "Legal Library", "About"])
     if page == "Chambers": render_chambers()
     elif page == "Legal Library": render_library()
     else: render_about()
-
