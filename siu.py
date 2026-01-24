@@ -1,4 +1,4 @@
-NI
+
 
 import streamlit as st
 import os
@@ -31,7 +31,7 @@ from streamlit_mic_recorder import speech_to_text
 from streamlit_google_auth import Authenticate
 
 # Secure way to fetch keys on deployment
-API_KEY = st.secrets["GOOGLE_API_KEY"]
+API_KEY = st.secrets["GEMINI_API_KEY"]
 DATA_FOLDER = "data"
 DB_PATH = "./chroma_db"
 SQL_DB_FILE = "advocate_ai_v2.db"
@@ -369,6 +369,7 @@ else:
         * Daniyal Faraz
 
         """)
+
 
 
 
