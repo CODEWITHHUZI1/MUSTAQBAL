@@ -11,7 +11,7 @@ from email.mime.multipart import MIMEMultipart
 import streamlit.components.v1 as components
 
 # ==============================================================================
-# 1. DATABASE & UTILITY FUNCTIONS (Defined First to avoid NameError)
+# 1. DATABASE & UTILITY FUNCTIONS
 # ==============================================================================
 
 SQL_DB_FILE = "advocate_ai_v3.db"
@@ -101,7 +101,6 @@ def send_email_report(receiver_email, case_name, content):
         st.error(f"Mail failed: {e}")
         return False
 
-# Start DB
 init_sql_db()
 
 # ==============================================================================
@@ -156,7 +155,6 @@ ai_engine, vector_embedder = load_models()
 # ==============================================================================
 
 def render_chambers_page():
-    # Session Initialization
     cases = db_get_cases(st.session_state.user_email)
     if "active_case" not in st.session_state: st.session_state.active_case = cases[0]
     if "target_lang" not in st.session_state: st.session_state.target_lang = "English"
@@ -198,7 +196,6 @@ def render_chambers_page():
             if send_email_report(st.session_state.user_email, st.session_state.active_case, st.session_state.report):
                 st.success("Report Sent!")
 
-    # UI Header & Quick Toggle
     st.header(f"💼 Case: {st.session_state.active_case}")
     t1, t2, _ = st.columns([1, 1, 5])
     if t1.button("🇺🇸 English"): 
@@ -208,11 +205,9 @@ def render_chambers_page():
         st.session_state.target_lang = "Urdu"
         st.rerun()
 
-    # Chat Display (Above input)
     for m in history:
         with st.chat_message(m["role"]): st.write(m["content"])
 
-    # Quick Actions
     st.divider()
     q1, q2, q3 = st.columns(3)
     quick_q = None
@@ -220,7 +215,6 @@ def render_chambers_page():
     if q2.button("📜 Give Ruling"): quick_q = "Provide a preliminary judicial observation."
     if q3.button("📝 Summarize"): quick_q = "Summarize the legal facts discussed."
 
-    # Input Bar
     c_txt, c_mic = st.columns([10, 1])
     with c_txt: text_in = st.chat_input("Consulting Counsel...")
     with c_mic: voice_in = speech_to_text(language=langs[st.session_state.target_lang], key='mic', just_once=True)
@@ -228,7 +222,9 @@ def render_chambers_page():
     final_q = quick_q or voice_in or text_in
     if final_q:
         db_save_message(st.session_state.user_email, st.session_state.active_case, "user", final_q)
-        ans = ai_engine.invoke(f"Expert in {st.session_state.target_lang}. User says: {final_q}").content
+        # --- THE FIX: We explicitly tell the AI to respond in the selected target language ---
+        prompt = f"You are a legal expert. You MUST respond ONLY in the {st.session_state.target_lang} language. User says: {final_q}"
+        ans = ai_engine.invoke(prompt).content
         db_save_message(st.session_state.user_email, st.session_state.active_case, "assistant", ans)
         play_voice_js(ans, langs[st.session_state.target_lang])
         st.rerun()
