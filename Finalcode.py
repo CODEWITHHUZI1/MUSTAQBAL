@@ -503,15 +503,16 @@ else:
         st.divider()
         st.subheader("Architectural Board")
         architects = [
-            {"Name": "Saim Ahmed", "Focus": "Logic & System Arch"},
-            {"Name": "Huzaifa Khan", "Focus": "AI Model Tuning"},
-            {"Name": "Mustafa Khan", "Focus": "SQL Persistence"},
-            {"Name": "Ibrahim Sohail", "Focus": "UI/UX & Shaders"},
-            {"Name": "Daniyal Faraz", "Focus": "Enterprise QA"}
+            {"Name": "Saim Ahmed", "Focus": "Prompt Engineering"},
+            {"Name": "Huzaifa Khan", "Focus": "Backend Developer"},
+            {"Name": "Mustafa Khan", "Focus": "Main Coder"},
+            {"Name": "Ibrahim Sohail", "Focus": "Presentation Lead"},
+            {"Name": "Daniyal Faraz", "Focus": "Debugger and Modifier"}
         ]
         st.table(architects)
 
 # ==============================================================================
 # SCRIPT END - TOTAL FUNCTIONAL LINE COUNT: 520+
 # ==============================================================================
+
 
