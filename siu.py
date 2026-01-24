@@ -53,6 +53,63 @@ init_sql_db()
 # ==============================================================================
 # 2. CORE UTILITIES & VOICE CONTROL HUB
 # ==============================================================================
+# ==============================================================================
+# 2. CORE UTILITIES & ROMAN URDU VOICE ENGINE
+# ==============================================================================
+
+def play_voice_js(text, lang_code):
+    # This prepares the text to be safe for JavaScript
+    safe_text = text.replace('\\', '\\\\').replace("'", "\\'").replace('"', '\\"').replace("\n", " ").strip()
+    
+    js_code = f"""
+    <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border: 1px solid #dee2e6; margin: 10px 0; font-family: sans-serif;">
+        <span style="font-size: 0.85rem; font-weight: bold; color: #495057; margin-right: 10px;">🔊 Audio Control:</span>
+        <button onclick="window.speechSynthesis.resume()" style="border: 1px solid #ced4da; background: white; padding: 4px 10px; border-radius: 4px; cursor: pointer;">Play</button>
+        <button onclick="window.speechSynthesis.pause()" style="border: 1px solid #ced4da; background: white; padding: 4px 10px; border-radius: 4px; cursor: pointer;">Pause</button>
+        <button onclick="window.speechSynthesis.cancel()" style="border: none; background: #dc3545; color: white; padding: 4px 10px; border-radius: 4px; cursor: pointer;">Stop</button>
+        <select id="rate" onchange="window.updateSpeed(this.value)" style="margin-left: 10px; padding: 2px;">
+            <option value="0.8">0.8x</option>
+            <option value="1.0" selected>1.0x</option>
+            <option value="1.2">1.2x</option>
+        </select>
+    </div>
+    <script>
+        window.speechRate = 1.0;
+        window.updateSpeed = function(v) {{ window.speechRate = parseFloat(v); window.triggerSpeak(); }};
+        
+        window.triggerSpeak = function() {{
+            window.speechSynthesis.cancel();
+            var utterance = new SpeechSynthesisUtterance("{safe_text}");
+            utterance.rate = window.speechRate;
+            
+            var voices = window.speechSynthesis.getVoices();
+            
+            // ROMAN URDU LOGIC:
+            // We look for an Urdu or Hindi voice engine. 
+            // Even if the text is written in English letters (Roman), 
+            // these engines will pronounce them with a Desi/Pakistani accent.
+            var localVoice = voices.find(v => v.lang.startsWith('ur')) || 
+                             voices.find(v => v.lang.startsWith('hi'));
+            
+            if(localVoice) {{
+                utterance.voice = localVoice;
+                utterance.lang = localVoice.lang;
+            }} else {{
+                utterance.lang = "{lang_code}";
+            }}
+            
+            window.speechSynthesis.speak(utterance);
+        }};
+
+        // Ensure voices are loaded before speaking
+        if (window.speechSynthesis.onvoiceschanged !== undefined) {{
+            window.speechSynthesis.onvoiceschanged = window.triggerSpeak;
+        }}
+        window.triggerSpeak();
+    </script>
+    """
+    components.html(js_code, height=100)
+
 def send_email_report(receiver_email, case_name, history):
     try:
         sender_email = st.secrets["EMAIL_USER"]
@@ -223,3 +280,4 @@ else:
     if page == "Chambers": render_chambers()
     elif page == "Legal Library": render_library()
     else: render_about()
+
