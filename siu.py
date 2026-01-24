@@ -6,7 +6,7 @@ import streamlit as st
 import sqlite3
 import datetime
 import smtplib
-import time  # Added for TTS synchronization
+import time
 import streamlit.components.v1 as components
 from langchain_google_genai import ChatGoogleGenerativeAI
 from streamlit_mic_recorder import speech_to_text
@@ -14,7 +14,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ==============================================================================
-# 1. INITIALIZATION & DATABASE
+# 1. INITIALIZATION & DATABASE (REMAINING SAME)
 # ==============================================================================
 st.set_page_config(page_title="Alpha Apex", page_icon="⚖️", layout="wide")
 API_KEY = st.secrets["GEMINI_API_KEY"]
@@ -51,7 +51,7 @@ def db_load_history(email, case_name):
 init_sql_db()
 
 # ==============================================================================
-# 2. CORE UTILITIES
+# 2. CORE UTILITIES (REMAINING SAME)
 # ==============================================================================
 def send_email_report(receiver_email, case_name, history):
     try:
@@ -78,25 +78,46 @@ def load_llm():
         safety_settings={"HARM_CATEGORY_HARASSMENT": "BLOCK_NONE", "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE", "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE", "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE"}
     )
 
+# --- EDITED VOICE OUTPUT PART ---
 def play_voice_js(text, lang_code):
-    # Fixed: Better escaping to prevent JavaScript syntax errors
-    safe_text = text.replace("'", "\\'").replace('"', '\\"').replace("\n", " ").strip()
+    # Escaping special characters for JavaScript safety
+    safe_text = text.replace('\\', '\\\\').replace("'", "\\'").replace('"', '\\"').replace("\n", " ")
     js_code = f"""
         <script>
-            window.speechSynthesis.cancel(); 
-            var msg = new SpeechSynthesisUtterance('{safe_text}'); 
-            msg.lang = '{lang_code}'; 
-            window.speechSynthesis.speak(msg);
+            function speak() {{
+                window.speechSynthesis.cancel();
+                var msg = new SpeechSynthesisUtterance('{safe_text}');
+                msg.lang = '{lang_code}';
+                
+                // Forces the browser to look for an Urdu voice if lang_code is ur-PK
+                var voices = window.speechSynthesis.getVoices();
+                if (voices.length > 0) {{
+                    var selectedVoice = voices.find(v => v.lang.includes('{lang_code.split('-')[0]}'));
+                    if (selectedVoice) msg.voice = selectedVoice;
+                }}
+                
+                msg.rate = 0.95; // Slightly slower for better Urdu articulation
+                window.speechSynthesis.speak(msg);
+            }}
+            
+            // Wait for voices to load (essential for Chrome/Edge)
+            if (window.speechSynthesis.onvoiceschanged !== undefined) {{
+                window.speechSynthesis.onvoiceschanged = speak;
+            }}
+            speak();
         </script>
     """
     components.html(js_code, height=0)
 
 # ==============================================================================
-# 3. CHAMBERS (WITH IRAC & CUSTOM INSTRUCTIONS)
+# 3. CHAMBERS (REMAINING SAME)
 # ==============================================================================
 def render_chambers():
     langs = {"English": "en-US", "Urdu": "ur-PK", "Sindhi": "sd-PK", "Punjabi": "pa-PK", "Pashto": "ps-PK", "Balochi": "bal-PK"}
     
+    if "last_spoken" not in st.session_state:
+        st.session_state.last_spoken = None
+
     with st.sidebar:
         st.title("⚖️ Alpha Apex")
         target_lang = st.selectbox("🌐 Language", list(langs.keys()))
@@ -107,10 +128,8 @@ def render_chambers():
         with st.expander("Custom Instructions & Behavior", expanded=True):
             sys_persona = st.text_input("Core Persona:", value="#You are a Pakistani law analyst")
             custom_instructions = st.text_area("Custom System Instructions:", 
-                placeholder="e.g. Focus on inheritance law, always cite PPC 302, etc.",
-                help="Customize how you want Alpha Apex to behave.")
-            
-            use_irac = st.toggle("Enable IRAC Style", value=True, help="Issue, Rule, Analysis, Conclusion")
+                placeholder="e.g. Focus on inheritance law, always cite PPC 302, etc.")
+            use_irac = st.toggle("Enable IRAC Style", value=True)
         
         st.divider()
         st.subheader("📁 Case Management")
@@ -140,10 +159,19 @@ def render_chambers():
 
     st.header(f"💼 Chambers: {st.session_state.active_case}")
     
+    # 1. Display History
     history = db_load_history(st.session_state.user_email, st.session_state.active_case)
     for m in history:
         with st.chat_message(m["role"]): st.write(m["content"])
 
+    # --- EDITED VOICE TRIGGER PART ---
+    if history and history[-1]["role"] == "assistant":
+        last_msg_content = history[-1]["content"]
+        if st.session_state.last_spoken != last_msg_content:
+            play_voice_js(last_msg_content, lang_code)
+            st.session_state.last_spoken = last_msg_content
+
+    # 3. Inputs
     m_col, i_col = st.columns([1, 8])
     with m_col: voice_in = speech_to_text(language=lang_code, key='mic', just_once=True)
     with i_col: text_in = st.chat_input("Start legal consultation...")
@@ -151,38 +179,23 @@ def render_chambers():
     query = voice_in or text_in
     if query:
         db_save_message(st.session_state.user_email, st.session_state.active_case, "user", query)
-        with st.chat_message("user"): st.write(query)
         
-        with st.chat_message("assistant"):
-            try:
-                irac_style = """
-                Structure your response strictly using the IRAC method:
-                - ISSUE: Clearly state the legal question.
-                - RULE: Cite relevant sections of the Pakistan Penal Code (PPC) or Constitution.
-                - ANALYSIS: Apply the law to the client's specific facts.
-                - CONCLUSION: Provide a clear legal observation or next step.
-                """ if use_irac else "Provide a professional and helpful legal response."
+        try:
+            irac_style = """
+            Structure your response strictly using the IRAC method:
+            - ISSUE: ... - RULE: ... - ANALYSIS: ... - CONCLUSION: ...
+            """ if use_irac else "Provide a professional legal response."
 
-                full_system_prompt = f"""
-                {sys_persona}
-                {irac_style}
-                ADDITIONAL INSTRUCTIONS: {custom_instructions}
-                RESPONSE LANGUAGE: {target_lang}
-                """
-                
-                response = load_llm().invoke(f"{full_system_prompt}\n\nClient Query: {query}").content
-                st.markdown(response)
-                db_save_message(st.session_state.user_email, st.session_state.active_case, "assistant", response)
-                
-                # --- TTS Trigger ---
-                play_voice_js(response, lang_code)
-                time.sleep(1) # Give browser a moment to initialize audio before rerun
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error: {e}")
+            full_system_prompt = f"{sys_persona}\n{irac_style}\nADDITIONAL: {custom_instructions}\nLANGUAGE: {target_lang}"
+            response = load_llm().invoke(f"{full_system_prompt}\n\nClient Query: {query}").content
+            
+            db_save_message(st.session_state.user_email, st.session_state.active_case, "assistant", response)
+            st.rerun() 
+        except Exception as e:
+            st.error(f"Error: {e}")
 
 # ==============================================================================
-# 4. LIBRARY & ABOUT
+# 4. LIBRARY & ABOUT (REMAINING SAME)
 # ==============================================================================
 def render_library():
     st.header("📚 Legal Library")
@@ -200,11 +213,7 @@ def render_about():
     ]
     st.table(team)
 
-# ==============================================================================
-# 5. MAIN FLOW
-# ==============================================================================
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
-
 if not st.session_state.logged_in:
     st.title("⚖️ Alpha Apex Login")
     email = st.text_input("Email Address")
