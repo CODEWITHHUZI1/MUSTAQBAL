@@ -179,7 +179,7 @@ def render_chambers():
     if query:
         db_save_message(st.session_state.user_email, active_case, "user", query)
         try:
-            llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=API_KEY)
+            llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=API_KEY)
             irac = "Structure: Issue, Rule, Analysis, Conclusion." if use_irac else ""
             prompt = f"{sys_persona}\n{irac}\nRespond strictly in {target_lang} script.\n\nQuery: {query}"
             
@@ -209,3 +209,4 @@ else:
     page = st.sidebar.radio("Navigation", ["Chambers", "About"])
     if page == "Chambers": render_chambers()
     else: render_about()
+
