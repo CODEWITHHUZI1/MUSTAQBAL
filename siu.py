@@ -195,6 +195,7 @@ elif:
     page = st.sidebar.radio("Nav", ["Chambers", "Library", "About"])
     if page == "Chambers": render_chambers()
     elif page == "Library": st.header("📚 Library")
+    else page == "About":   st.header("ℹ️ About Alpha Apex")
 else:
    
     st.header("ℹ️ About Alpha Apex")
@@ -224,5 +225,6 @@ else:
     # 3. Version Info
     st.caption("Alpha Apex v5.0 | Last Updated: January 2026")
         
+
 
 
