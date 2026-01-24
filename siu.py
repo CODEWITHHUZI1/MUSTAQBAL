@@ -196,3 +196,31 @@ else:
     if page == "Chambers": render_chambers()
     elif page == "Library": st.header("📚 Library")
     else: st.header("ℹ️ About")
+    def render_about():
+    st.header("ℹ️ About Alpha Apex")
+    
+    # 1. Mission Statement or Description
+    st.markdown("""
+    ### 🏛️ Our Mission
+    Alpha Apex is an AI-driven legal intelligence platform designed to provide 
+    **accessible, real-time legal analysis** for the Pakistani community. 
+    By bridging the gap between complex legal statutes and local languages, 
+    we empower citizens and legal professionals alike.
+    """)
+    
+    st.divider()
+    
+    # 2. Updated Team Table
+    st.subheader("👥 The Development Team")
+    team = [
+        {"Name": "Saim Ahmed", "Role": "Lead Developer", "Contact": "03700297696"},
+        {"Name": "Huzaifa Khan", "Role": "Legal AI Strategist", "Contact": "03102526567"},
+        {"Name": "Mustafa Khan", "Role": "Backend Architect", "Contact": "03460222290"},
+        {"Name": "Ibrahim Sohail", "Role": "UI/UX Designer", "Contact": "03212046403"},
+        {"Name": "Daniyal Faraz", "Role": "System Integration", "Contact": "03333502530"},
+    ]
+    st.table(team)
+
+    # 3. Version Info
+    st.caption("Alpha Apex v5.0 | Last Updated: January 2026")
+
