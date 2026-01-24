@@ -249,14 +249,16 @@ def render_library():
 def render_about():
     st.header("ℹ️ About Alpha Apex")
     st.info("Version: 2.1.0 | Engine: Google Gemini 1.5")
-   st.table([
-    {"Name": "Saim Ahmed", "Designation": "Lead Full Stack Developer", "Email": "saimahmed@example.com"}, 
-    {"Name": "Huzaifa Khan", "Designation": "AI System Architect", "Email": "m.huzaifa.khan471@gmail.com"},
-    {"Name": "Ibrahim Sohail", "Designation": "Presentation Lead", "Email": "ibrahimsohailkhan10@gmail.com"},
-    {"Name": "Daniyal Faraz", "Designation": "Debugger", "Email": "daniyalfarazkhan2012@gmail.com"},
-    {"Name": "Muhammad Mustafa Khan", "Designation": "Prompt Engineer", "Email": "muhammadmustafakhan430@gmail.com"}
-])
-
+    
+    # This list and the table below are now aligned with st.header
+    team_data = [
+        {"Name": "Saim Ahmed", "Designation": "Lead Full Stack Developer", "Email": "saimahmed@example.com"}, 
+        {"Name": "Huzaifa Khan", "Designation": "AI System Architect", "Email": "m.huzaifa.khan471@gmail.com"},
+        {"Name": "Ibrahim Sohail", "Designation": "Presentation Lead", "Email": "ibrahimsohailkhan10@gmail.com"},
+        {"Name": "Daniyal Faraz", "Designation": "Debugger", "Email": "daniyalfarazkhan2012@gmail.com"},
+        {"Name": "Muhammad Mustafa Khan", "Designation": "Prompt Engineer", "Email": "muhammadmustafakhan430@gmail.com"}
+    ]
+    st.table(team_data)
 def render_login_portal():
     st.title("⚖️ Alpha Apex Secure Entrance")
     user_info = authenticator.login()
@@ -309,6 +311,7 @@ else:
     if navigation_selection == "Consultation Chambers": render_chambers()
     elif navigation_selection == "Digital Library": render_library()
     else: render_about()
+
 
 
 
