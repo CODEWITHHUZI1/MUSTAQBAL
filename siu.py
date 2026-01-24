@@ -57,6 +57,20 @@ init_sql_db()
 # ==============================================================================
 # 2. CORE UTILITIES & VOICE ENGINE
 # ==============================================================================
+engine = pyttsx3.init()
+
+def speak_urdu_free(text, lang_code):
+    voices = engine.getProperty('voices')
+
+    for v in voices:
+        if "urdu" in v.name.lower() or "pakistan" in v.name.lower():
+            engine.setProperty('voice', v.id)
+            break
+
+    engine.setProperty('rate', 150)
+    engine.say(text)
+    engine.runAndWait()
+
 def send_email_report(receiver_email, case_name, history):
     try:
         sender_email = st.secrets["EMAIL_USER"]
@@ -235,5 +249,6 @@ else:
     if page == "Chambers": render_chambers()
     elif page == "Legal Library": render_library()
     else: render_about()
+
 
 
