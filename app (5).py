@@ -30,7 +30,7 @@ st.set_page_config(
 # Core Application Constants
 API_KEY = st.secrets["GOOGLE_API_KEY"]
 SQL_DB_FILE = "alpha_apex_production_v11.db"
-DATA_FOLDER = "data"
+DATA_FOLDER = "DATA"
 
 # Ensure Environment Integrity
 if not os.path.exists(DATA_FOLDER):
@@ -523,6 +523,7 @@ else:
 # ==============================================================================
 # END OF ENTERPRISE SCRIPT (VERIFIED 400+ LINES)
 # ==============================================================================
+
 
 
 
