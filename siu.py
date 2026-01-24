@@ -95,7 +95,7 @@ def render_chambers():
         st.divider()
         st.subheader("🏛️ System Configuration")
         with st.expander("Custom Instructions & Behavior", expanded=True):
-            sys_persona = st.text_input("Core Persona:", value="#You are a legal analyst")
+            sys_persona = st.text_input("Core Persona:", value="#You are a Pakistani law analyst")
             custom_instructions = st.text_area("Custom System Instructions:", 
                 placeholder="e.g. Focus on inheritance law, always cite PPC 302, etc.",
                 help="Customize how you want Alpha Apex to behave.")
@@ -209,6 +209,7 @@ else:
     if page == "Chambers": render_chambers()
     elif page == "Legal Library": render_library()
     else: render_about()
+
 
 
 
