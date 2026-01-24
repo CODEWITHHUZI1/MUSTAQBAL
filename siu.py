@@ -49,11 +49,17 @@ def db_load_history(email, case_name):
 init_sql_db()
 
 # ==============================================================================
-# 2. UTILITIES (Voice & Email)
+# 2. VOICE & EMAIL UTILITIES
 # ==============================================================================
 def play_voice_js(roman_text):
     safe_text = roman_text.replace('\\', '\\\\').replace("'", "\\'").replace('"', '\\"').replace("\n", " ").strip()
     js_code = f"""
+    <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #dee2e6; margin: 10px 0; font-family: sans-serif;">
+        <span style="font-size: 0.8rem; font-weight: bold; color: #475569;">🔊 Audio Control:</span>
+        <button onclick="window.speechSynthesis.resume()" style="margin-left: 10px; padding: 4px 8px; cursor: pointer;">Play</button>
+        <button onclick="window.speechSynthesis.pause()" style="margin-left: 5px; padding: 4px 8px; cursor: pointer;">Pause</button>
+        <button onclick="window.speechSynthesis.cancel()" style="margin-left: 5px; padding: 4px 8px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer;">Stop</button>
+    </div>
     <script>
         function speakNow() {{
             window.speechSynthesis.cancel();
@@ -68,7 +74,7 @@ def play_voice_js(roman_text):
         speakNow();
     </script>
     """
-    components.html(js_code, height=0)
+    components.html(js_code, height=90)
 
 def send_email_report(receiver_email, case_name, history):
     try:
@@ -77,8 +83,7 @@ def send_email_report(receiver_email, case_name, history):
         body = f"Legal Consultation Summary: {case_name}\n\n"
         for m in history:
             role = "Expert" if m['role'] == 'assistant' else "Client"
-            content = m['content'].split("|||")[0]
-            body += f"{role}: {content}\n\n"
+            body += f"{role}: {m['content'].split('|||')[0]}\n\n"
         msg = MIMEMultipart()
         msg['From'] = f"Alpha Apex <{sender_email}>"; msg['To'] = receiver_email
         msg['Subject'] = f"Case Report: {case_name}"; msg.attach(MIMEText(body, 'plain'))
@@ -88,7 +93,7 @@ def send_email_report(receiver_email, case_name, history):
     except: return False
 
 # ==============================================================================
-# 3. CHAMBERS (WITH QUICK ACTIONS)
+# 3. CHAMBERS
 # ==============================================================================
 def render_chambers():
     langs = {"Urdu": "ur-PK", "English": "en-US", "Sindhi": "sd-PK", "Pashto": "ps-PK", "Balochi": "bal-PK"}
@@ -97,18 +102,37 @@ def render_chambers():
         st.title("⚖️ Alpha Apex")
         target_lang = st.selectbox("🌐 Visual Language", list(langs.keys()))
         st.divider()
-        st.subheader("🏛️ Configuration")
-        with st.expander("Behavior", expanded=True):
-            sys_persona = st.text_input("Persona:", value="You are a Pakistani Law Analyst.")
-            use_irac = st.toggle("Enable IRAC", value=True)
-        st.divider()
+        
+        st.subheader("📁 Case Management")
         conn = sqlite3.connect(SQL_DB_FILE)
         cases = [r[0] for r in conn.execute("SELECT case_name FROM cases WHERE email=?", (st.session_state.user_email,)).fetchall()]
         conn.close()
-        active_case = st.selectbox("Current Case", cases if cases else ["General"])
+        
+        active_case = st.selectbox("Active Case", cases if cases else ["General"])
         st.session_state.active_case = active_case
 
-    # Top Right Email Action
+        # NEW CASE & RENAME
+        with st.expander("Edit Cases"):
+            new_c_name = st.text_input("New Case Name")
+            if st.button("➕ Create New"):
+                if new_c_name:
+                    conn = sqlite3.connect(SQL_DB_FILE)
+                    conn.execute("INSERT INTO cases (email, case_name, created_at) VALUES (?,?,?)", (st.session_state.user_email, new_c_name, "2026-01-24"))
+                    conn.commit(); conn.close(); st.rerun()
+            
+            rename_val = st.text_input("Rename Active Case To:")
+            if st.button("📝 Rename"):
+                if rename_val:
+                    conn = sqlite3.connect(SQL_DB_FILE)
+                    conn.execute("UPDATE cases SET case_name=? WHERE email=? AND case_name=?", (rename_val, st.session_state.user_email, active_case))
+                    conn.commit(); conn.close(); st.rerun()
+
+        st.divider()
+        st.subheader("🏛️ Configuration")
+        sys_persona = st.text_input("Persona:", value="You are a Pakistani Law Analyst.")
+        use_irac = st.toggle("Enable IRAC", value=True)
+
+    # Header Row
     h1, h2 = st.columns([8, 2])
     with h1: st.header(f"💼 Case: {active_case}")
     with h2: 
@@ -119,18 +143,18 @@ def render_chambers():
 
     chat_container = st.container()
     
-    # Quick Action Buttons
+    # Quick Actions
     st.write("### Quick Actions")
     q1, q2, q3 = st.columns(3)
     quick_query = None
-    if q1.button("🔍 Infer Legal Context"): quick_query = "Please infer the legal implications of our last conversation."
-    if q2.button("⚖️ Give Ruling/Opinion"): quick_query = "Based on Pakistani law, give a definitive ruling or opinion on this situation."
-    if q3.button("📝 Summarize Case"): quick_query = "Summarize our entire discussion into a concise legal brief."
+    if q1.button("🔍 Infer Context"): quick_query = "Infer legal context from our last points."
+    if q2.button("⚖️ Give Ruling"): quick_query = "Give a legal ruling/opinion based on Pakistani law."
+    if q3.button("📝 Summarize"): quick_query = "Summarize this case into a brief."
 
     st.divider()
     m_col, i_col = st.columns([1, 8])
     with m_col: voice_in = speech_to_text(language=langs[target_lang], key='mic', just_once=True)
-    with i_col: text_in = st.chat_input("Type here...")
+    with i_col: text_in = st.chat_input("Ask a question...")
 
     history = db_load_history(st.session_state.user_email, active_case)
     with chat_container:
