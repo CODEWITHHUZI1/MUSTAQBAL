@@ -71,7 +71,7 @@ def send_email_report(receiver_email, case_name, history):
 @st.cache_resource
 def load_llm():
     return ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash", google_api_key=API_KEY, temperature=0.2,
+        model="gemini-2.5-flash", google_api_key=API_KEY, temperature=0.2,
         safety_settings={"HARM_CATEGORY_HARASSMENT": "BLOCK_NONE", "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE", "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE", "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE"}
     )
 
@@ -209,3 +209,4 @@ else:
     if page == "Chambers": render_chambers()
     elif page == "Legal Library": render_library()
     else: render_about()
+
