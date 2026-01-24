@@ -249,7 +249,7 @@ def render_library():
 def render_about():
     st.header("ℹ️ About Alpha Apex")
     st.info("Version: 2.1.0 | Engine: Google Gemini 1.5")
-    st.table([{"Name": "Saim Ahmed", "Designation": "Lead Full Stack Developer"}, {"Name": "Huzaifa Khan", "Designation": "AI System Architect"}])
+    st.table([{"Name": "Saim Ahmed", "Designation": "Lead Full Stack Developer"}, {"Name": "Huzaifa Khan", "Designation": "AI System Architect"},{"Name": "Ibrahim Sohail","Designation":"Presentation Lead"},{"Name":"Daniyal Faraz", "Designation": "Debugger"}])
 
 def render_login_portal():
     st.title("⚖️ Alpha Apex Secure Entrance")
@@ -303,3 +303,4 @@ else:
     if navigation_selection == "Consultation Chambers": render_chambers()
     elif navigation_selection == "Digital Library": render_library()
     else: render_about()
+
