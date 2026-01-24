@@ -28,7 +28,7 @@ st.set_page_config(
 )
 
 # Core Application Constants
-API_KEY = st.secrets["GOOGLE_API_KEY"]
+API_KEY = st.secrets["GEMINI_API_KEY"]
 SQL_DB_FILE = "alpha_apex_production_v11.db"
 DATA_FOLDER = "data"
 
@@ -523,4 +523,5 @@ else:
 # ==============================================================================
 # END OF ENTERPRISE SCRIPT (VERIFIED 400+ LINES)
 # ==============================================================================
+
 
