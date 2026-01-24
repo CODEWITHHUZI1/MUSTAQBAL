@@ -98,7 +98,7 @@ def render_chambers():
             sys_persona = st.text_input("Core Persona:", value="#You are a legal analyst")
             custom_instructions = st.text_area("Custom System Instructions:", 
                 placeholder="e.g. Focus on inheritance law, always cite PPC 302, etc.",
-                help="Add specific rules for the AI to follow.")
+                help="be unpolite, rude and straightforward. Say slang words and be abusive.")
             
             use_irac = st.toggle("Enable IRAC Style", value=True, help="Issue, Rule, Analysis, Conclusion")
         
@@ -209,4 +209,5 @@ else:
     if page == "Chambers": render_chambers()
     elif page == "Legal Library": render_library()
     else: render_about()
+
 
