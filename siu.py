@@ -128,7 +128,7 @@ def render_chambers():
         
         # 2. Generate and Show AI Response
         try:
-            llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=API_KEY)
+            llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=API_KEY)
             irac = "Structure: Issue, Rule, Analysis, Conclusion." if use_irac else ""
             prompt = f"{sys_persona}\n{irac}\nRespond strictly in {target_lang} script. Query: {query}"
             
@@ -161,3 +161,4 @@ else:
     page = st.sidebar.radio("Navigation", ["Chambers", "About"])
     if page == "Chambers": render_chambers()
     else: st.write("Legal AI platform.")
+
