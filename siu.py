@@ -14,7 +14,7 @@ from streamlit_mic_recorder import speech_to_text
 # ==============================================================================
 st.set_page_config(page_title="Alpha Apex", page_icon="⚖️", layout="wide")
 API_KEY = st.secrets["GEMINI_API_KEY"]
-SQL_DB_FILE = "advocate_ai_v6.db"
+SQL_DB_FILE = "advocate_ai_v7.db"
 
 def init_sql_db():
     conn = sqlite3.connect(SQL_DB_FILE)
@@ -46,27 +46,24 @@ def db_load_history(email, case_name):
 init_sql_db()
 
 # ==============================================================================
-# 2. STRICT ENGLISH TTS UTILITY
+# 2. STRICT ENGLISH-ONLY TTS ENGINE
 # ==============================================================================
 def play_voice_js(english_text):
-    """Strictly filters for English voices only"""
     safe_text = english_text.replace('\\', '\\\\').replace("'", "\\'").replace('"', '\\"').replace("\n", " ").strip()
     js_code = f"""
-    <div style="background: #f1f5f9; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; margin: 10px 0;">
-        <span style="font-size: 0.8rem; font-weight: bold; color: #1e293b;">🔊 Audio Brief (English):</span>
-        <button onclick="window.speakEnglish()">▶ Play</button>
-        <button onclick="window.speechSynthesis.pause()">⏸ Pause</button>
-        <button onclick="window.speechSynthesis.cancel()" style="background:#fca5a5; border:none; border-radius:3px;">⏹ Stop</button>
+    <div style="background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 10px 0; font-family: sans-serif;">
+        <span style="font-size: 0.8rem; font-weight: bold; color: #1e293b;">🔊 English Audio Summary:</span>
+        <button onclick="window.speakEnglish()" style="margin-left:10px;">Play</button>
+        <button onclick="window.speechSynthesis.pause()">Pause</button>
+        <button onclick="window.speechSynthesis.cancel()">Stop</button>
     </div>
     <script>
         window.speakEnglish = function() {{
             window.speechSynthesis.cancel();
             var msg = new SpeechSynthesisUtterance("{safe_text}");
-            
-            // Force English Voice
             var voices = window.speechSynthesis.getVoices();
+            // Strictly select English voice
             var enVoice = voices.find(v => v.lang.startsWith('en-US')) || voices.find(v => v.lang.startsWith('en'));
-            
             if(enVoice) {{
                 msg.voice = enVoice;
                 msg.lang = 'en-US';
@@ -74,7 +71,6 @@ def play_voice_js(english_text):
             msg.rate = 1.0;
             window.speechSynthesis.speak(msg);
         }};
-        // Ensure voices are loaded
         if (speechSynthesis.onvoiceschanged !== undefined) {{
             speechSynthesis.onvoiceschanged = window.speakEnglish;
         }}
@@ -104,14 +100,6 @@ def render_chambers():
     st.header(f"💼 Case: {active_case}")
     chat_container = st.container()
     
-    # Quick Actions
-    st.write("### Quick Actions")
-    q1, q2, q3 = st.columns(3)
-    quick_query = None
-    if q1.button("🔍 Infer Context"): quick_query = "Summarize the legal context of this case in English."
-    if q2.button("⚖️ Give Ruling"): quick_query = "What is the legal opinion on this under Pakistan Law? Explain in English."
-    if q3.button("📝 Summarize"): quick_query = "Give me a brief summary of the case facts in English."
-
     st.divider()
     m_col, i_col = st.columns([1, 8])
     with m_col: voice_in = speech_to_text(language=langs[target_lang], key='mic', just_once=True)
@@ -121,26 +109,24 @@ def render_chambers():
     with chat_container:
         for m in history:
             with st.chat_message(m["role"]):
-                # Only show the script part to the user
+                # Display only the first part (Native Script)
                 st.write(m["content"].split("|||")[0])
 
-    final_query = voice_in or text_in or quick_query
+    final_query = voice_in or text_in
     if final_query:
         db_save_message(st.session_state.user_email, active_case, "user", final_query)
         try:
             llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=API_KEY)
             
-            # MANDATORY FORMATTING INSTRUCTION
+            # THE STRICT TWO-PART PROMPT
             prompt = f"""
-            SYSTEM: You are a Pakistani Legal Expert.
-            USER REQUEST: {final_query}
+            You are a Pakistani Law Analyst.
+            1. Provide a detailed legal answer in {target_lang} script.
+            2. Provide a concise summary of that answer in English ONLY.
             
-            INSTRUCTIONS:
-            1. Respond in TWO DISTINCT PARTS separated by '|||'.
-            2. PART 1 (VISUAL): Write the full legal response in {target_lang} native script. Do NOT include English here.
-            3. PART 2 (AUDIO): Provide a concise English translation of that response. Do NOT include {target_lang} script here.
+            Format: [Native Script Response] ||| [English Audio Summary]
             
-            FORMAT: [Part 1 Script] ||| [Part 2 English]
+            Query: {final_query}
             """
             
             response = llm.invoke(prompt).content
@@ -150,36 +136,27 @@ def render_chambers():
 
     if history and history[-1]["role"] == "assistant":
         if "|||" in history[-1]["content"]:
-            # Extract ONLY the English part for TTS
-            parts = history[-1]["content"].split("|||")
-            english_tts_content = parts[1].strip()
-            
-            if st.session_state.get("last_spoken") != english_tts_content:
-                play_voice_js(english_tts_content)
-                st.session_state.last_spoken = english_tts_content
+            # Extract only Part 2 (English) for TTS
+            english_audio_text = history[-1]["content"].split("|||")[1].strip()
+            if st.session_state.get("last_spoken") != english_audio_text:
+                play_voice_js(english_audio_text)
+                st.session_state.last_spoken = english_audio_text
 
 # ==============================================================================
-# 4. ABOUT SECTION (Updated with your request)
+# 4. ABOUT SECTION
 # ==============================================================================
 def render_about():
     st.header("ℹ️ About Advocate AI")
     st.markdown("""
-    ### 🏛️ The Advocate AI: A Digital Bridge to Law
-    Alpha Apex is a specialized legal intelligence platform designed to make Pakistani law accessible to everyone. 
-    It translates complex statutes into conversational advice, acting as a 24/7 digital consultant.
+    ### 🏛️ Advocate AI: Digital Justice
+    Alpha Apex acts as a 24/7 digital consultant for Pakistani Law.
     
-    ### ⚠️ The Problem: The Justice Gap
-    The primary problem in Pakistan’s legal landscape is the "justice gap" caused by high consultation costs, 
-    dense legal jargon, and severe language barriers.
-    
-    ### ✨ The Solution: Democratizing Legal Power
-    This AI creates value by offering instant analysis in native scripts (Sindhi, Pashto, Balochi) 
-    while providing English audio summaries to ensure clarity and confidence.
+    ### ⚠️ Language Barriers Solved
+    This tool provides legal analysis in native **Sindhi, Pashto, and Balochi** scripts. 
+    To ensure technical clarity, all audio summaries are provided strictly in **English**.
     """)
 
-# Main Navigation logic (Fixed Syntax)
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
-
 if not st.session_state.logged_in:
     st.title("⚖️ Alpha Apex Login")
     email = st.text_input("Email")
