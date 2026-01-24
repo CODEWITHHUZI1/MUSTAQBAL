@@ -13,7 +13,7 @@ from streamlit_mic_recorder import speech_to_text
 # 1. SETUP
 # ==============================================================================
 st.set_page_config(page_title="Alpha Apex", page_icon="⚖️", layout="wide")
-API_KEY = st.secrets["GOOGLE_API_KEY"]
+API_KEY = st.secrets["GEMINI_API_KEY"]
 SQL_DB_FILE = "advocate_ai_v3.db"
 
 def init_sql_db():
@@ -174,6 +174,7 @@ if not st.session_state.logged_in:
             st.rerun()
 else:
     render_chambers_page()
+
 
 
 
