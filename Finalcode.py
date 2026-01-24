@@ -52,7 +52,7 @@ def apply_leviathan_shaders():
         
         /* Permanent Dark App Canvas */
         .stApp { 
-            background-color: #020617 !important; 
+            background-color: f1f5f9 !important; 
             color: #f1f5f9 !important; 
         }
 
