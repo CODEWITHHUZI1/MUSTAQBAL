@@ -1,4 +1,3 @@
-
 import streamlit as st
 import os
 import sqlite3
@@ -11,6 +10,7 @@ import re
 from datetime import datetime
 import chromadb
 from langchain_chroma import Chroma
+
 # ==============================================================================
 # 1. SYSTEM CONFIGURATION
 # ==============================================================================
@@ -44,20 +44,14 @@ st.set_page_config(page_title="Advocate AI", page_icon="⚖️", layout="wide")
 
 st.markdown("""
     <style>
-    /* Ensure the main container has enough bottom padding so input doesn't cover text */
     .main .block-container { padding-bottom: 150px; }
-    
     .stChatMessage { border-radius: 15px; margin-bottom: 10px; border: 1px solid #eee; }
-    
-    /* Mic Alignment Fix */
     .mic-box {
         display: flex;
         align-items: center;
         justify-content: center;
         padding-top: 38px;
     }
-    
-    /* Urdu Font */
     [data-testid="stMarkdownContainer"] p {
         font-family: 'Segoe UI', 'Tahoma', sans-serif;
         font-size: 1.1rem;
@@ -67,16 +61,16 @@ st.markdown("""
 
 def play_voice_js(text):
     safe_text = text.replace("'", "").replace('"', "").replace("\n", " ").strip()
-    is_urdu = bool(re.search(r'[\u0600-\u06FF]', safe_text))
+    is_local = bool(re.search(r'[\u0600-\u06FF]', safe_text))
     js_code = f"""
         <script>
             window.speechSynthesis.cancel();
             var msg = new SpeechSynthesisUtterance('{safe_text}');
             function setVoice() {{
                 var voices = window.speechSynthesis.getVoices();
-                if ({str(is_urdu).lower()}) {{
+                if ({str(is_local).lower()}) {{
                     msg.lang = 'ur-PK';
-                    var v = voices.find(v => v.lang.includes('ur') || v.lang.includes('hi'));
+                    var v = voices.find(v => v.lang.includes('ur') || v.lang.includes('hi') || v.lang.includes('sd'));
                     if (v) msg.voice = v;
                 }} else {{
                     msg.lang = 'en-US';
@@ -192,22 +186,16 @@ if "law_db" not in st.session_state:
 # 5. AUTH
 # ==============================================================================
 
-# 1. Create the physical file on the server from secrets
 try:
     config_dict = dict(st.secrets["google_auth"])
-    # Wrap in "web" as required by the underlying Google library
     secret_data = {"web": config_dict}
-    
     with open('client_secret.json', 'w') as f:
         json.dump(secret_data, f)
-        
     my_uri = config_dict['redirect_uris'][0]
 except KeyError:
     st.error("Missing 'google_auth' in Streamlit Secrets!")
     st.stop()
 
-# 2. Positional Arguments: (path, uri, cookie_name, key, expiry)
-# This format avoids "unexpected keyword argument" errors
 authenticator = Authenticate(
     'client_secret.json', 
     my_uri, 
@@ -236,24 +224,30 @@ def login_page():
                         st.session_state.username = e.split("@")[0].title()
                         db_register_user(e, st.session_state.username)
                         st.rerun()
+
+# ==============================================================================
+# 6. CHAMBERS PAGE (MULTILINGUAL INTEGRATED)
+# ==============================================================================
+
 def render_chambers_page():
-    # 1. Sidebar Logic (Enhanced with Risk Dashboard & Timeline)
+    # Languages Dictionary
+    languages = {
+        "English": "English", "Sindhi": "Sindhi (Sindhi script)", "Urdu": "Urdu (Urdu script)",
+        "Punjabi": "Punjabi (Shahmukhi script)", "Pashto": "Pashto (Pashto script)",
+        "Balochi": "Balochi (Arabic script)", "Arabic": "Arabic", "Turkish": "Turkish",
+        "Chinese": "Chinese (Simplified)", "French": "French", "Spanish": "Spanish",
+        "German": "German", "Russian": "Russian", "Hindi": "Hindi (Devanagari)",
+        "Bengali": "Bengali", "Japanese": "Japanese", "Korean": "Korean", "Persian": "Farsi"
+    }
+
     with st.sidebar:
         st.header(f"👨‍⚖️ {st.session_state.username}")
         
-        # --- RISK DASHBOARD ---
-        history = db_load_history(st.session_state.user_email, st.session_state.active_case)
-        danger_words = ["court", "arrest", "penalty", "illegal", "suit", "police", "notice", "jail", "fine"]
-        risk_score = min(sum((" ".join([m["content"].lower() for m in history])).count(w) for w in danger_words) * 12, 100)
-        
-        st.subheader("📊 Case Risk Profile")
-        st.progress(risk_score / 100)
-        if risk_score > 60: st.error(f"HIGH RISK: {risk_score}%")
-        elif risk_score > 30: st.warning(f"MEDIUM RISK: {risk_score}%")
-        else: st.success("LOW RISK: Stable")
+        # Multi-Language Selector
+        st.divider()
+        target_lang = st.selectbox("🌐 AI Response Language", options=list(languages.keys()), index=0)
         
         st.divider()
-
         cases = db_get_cases(st.session_state.user_email)
         if "active_case" not in st.session_state: st.session_state.active_case = cases[0]
         sel = st.selectbox("Case Files", cases, index=cases.index(st.session_state.active_case))
@@ -261,15 +255,6 @@ def render_chambers_page():
             st.session_state.active_case = sel
             st.rerun()
         
-        # --- TIMELINE BUTTON ---
-        if st.button("🕒 Extract Timeline"):
-            with st.expander("📅 Case Milestones", expanded=True):
-                if not history:
-                    st.write("No data yet.")
-                else:
-                    t_prompt = f"Extract only legal dates and events as a list from: {' '.join([m['content'] for m in history])}"
-                    st.write(ai_engine.invoke(t_prompt).content)
-
         with st.expander("Rename Case"):
             nt = st.text_input("New Name", value=st.session_state.active_case)
             if st.button("Confirm"):
@@ -288,27 +273,22 @@ def render_chambers_page():
 
     st.title(f"⚖️ {st.session_state.active_case}")
 
-    # 2. Chat History Block
     history_container = st.container()
     with history_container:
+        history = db_load_history(st.session_state.user_email, st.session_state.active_case)
         for msg in history:
             with st.chat_message(msg["role"]): st.markdown(msg["content"])
 
-    # 3. Input Tools Block (Enhanced with Language Toggle)
     input_placeholder = st.container()
     with input_placeholder:
-        # --- LANGUAGE TOGGLE ---
-        use_urdu = st.toggle("Urdu/Sindh Mode 🇵🇰", help="Switch AI response to Urdu script")
-        
         c_text, c_mic = st.columns([10, 1])
         with c_text:
-            text_in = st.chat_input("Ask Sindh Law / قانونی سوال...")
+            text_in = st.chat_input(f"Ask in {target_lang}...")
         with c_mic:
             st.markdown('<div class="mic-box">', unsafe_allow_html=True)
-            voice_in = speech_to_text(language='ur-PK' if use_urdu else 'en-US', start_prompt="🎤", stop_prompt="⏹️", key='mic_chambers', just_once=True)
+            voice_in = speech_to_text(language='en-US', start_prompt="🎤", stop_prompt="⏹️", key='mic_chambers', just_once=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
-    # 4. Logic Handling
     final_in = voice_in if voice_in else text_in
     is_v = True if voice_in else False
 
@@ -318,17 +298,14 @@ def render_chambers_page():
             with st.chat_message("user"): st.markdown(final_in)
             with st.chat_message("assistant"):
                 p, res = st.empty(), ""
-                ctx, sources = "", []
-                
+                ctx = ""
                 if st.session_state.law_db:
-                    docs = st.session_state.law_db.as_retriever(search_kwargs={"k": 3}).invoke(final_in)
+                    docs = st.session_state.law_db.as_retriever(search_kwargs={"k": 4}).invoke(final_in)
                     ctx = "\n\n".join([d.page_content for d in docs])
-                    # --- SOURCE EXTRACTION ---
-                    sources = [f"📄 {os.path.basename(d.metadata['source'])} (Pg. {d.metadata.get('page', '??')})" for d in docs]
                 
-                # --- DUAL LANGUAGE PROMPT ---
-                lang_instruction = "Respond in Urdu script (Urdu language)." if use_urdu else "Respond in English."
-                prompt = f"Senior Legal Expert Sindh Law. {lang_instruction}\nContext: {ctx}\nUser: {final_in}"
+                # Dynamic Instruction based on sidebar choice
+                chosen_script = languages[target_lang]
+                prompt = f"You are a Senior Legal Expert Sindh Law. You MUST respond ONLY in {chosen_script}. Ensure legal accuracy.\nContext: {ctx}\nUser: {final_in}"
                 
                 try:
                     ai_out = ai_engine.invoke(prompt).content
@@ -336,43 +313,26 @@ def render_chambers_page():
                         res += chunk
                         p.markdown(res + "▌")
                     p.markdown(res)
-                    
-                    # --- SHOW SOURCES ---
-                    if sources:
-                        with st.expander("📚 Legal Citations"):
-                            for s in sources: st.caption(s)
-                            
                     db_save_message(st.session_state.user_email, st.session_state.active_case, "assistant", res)
                     if is_v: play_voice_js(res)
                 except Exception as e: st.error(f"Error: {e}")
-# ==============================================================================
-# 7. MAIN
-# ==============================================================================
 
 # ==============================================================================
-# 7. MAIN EXECUTION FLOW (FIXED LOGIN & SESSION SYNC)
+# 7. MAIN EXECUTION
 # ==============================================================================
 
-# Step 1: Handle Google Handshake immediately
 if st.session_state.get('connected'):
-    # Check if we haven't synced the Google info to our local session yet
     if not st.session_state.get('logged_in'):
         user_info = st.session_state.get('user_info', {})
         st.session_state.user_email = user_info.get('email')
         st.session_state.username = user_info.get('name', "Lawyer")
         st.session_state.logged_in = True
-        
-        # Register in SQLite database
         db_register_user(st.session_state.user_email, st.session_state.username)
-        
-        # FORCE RERUN: This breaks the loop and moves the script to the 'else' block
         st.rerun()
 
-# Step 2: Determine which page to show based on finalized state
 if not st.session_state.get('logged_in'):
     login_page()
 else:
-    # Sidebar navigation for logged-in users
     with st.sidebar:
         st.markdown("---")
         nav = st.radio("Navigate", ["🏢 Chambers", "📚 Library", "ℹ️ Team"], label_visibility="collapsed")
@@ -388,7 +348,7 @@ else:
             st.warning("No legal documents found in DATA folder.")
     else:
         st.title("ℹ️ Development Team")
-        st.info("Advocate AI - Sindh Legal Intelligence System")
+        st.info("Advocate AI - Alpha Apex")
         st.markdown("""
         **Project Contributors:**
         * Saim Ahmed
@@ -396,18 +356,4 @@ else:
         * Ibrahim Sohail
         * Huzaifa Khan
         * Daniyal Faraz
-
         """)
-
-
-
-
-
-
-
-
-
-
-
-
-
