@@ -127,7 +127,6 @@ def render_chambers():
         active_case = st.selectbox("Select Case", cases)
         st.session_state.active_case = active_case
 
-        # NEW CASE
         new_case_name = st.text_input("New Case Name")
         if st.button("➕ Create New Case"):
             if new_case_name:
@@ -136,7 +135,6 @@ def render_chambers():
                 conn.commit(); conn.close()
                 st.rerun()
 
-        # RENAME CASE
         rename_to = st.text_input("Rename Current Case to:")
         if st.button("✏️ Rename Case"):
             if rename_to and active_case:
@@ -145,7 +143,6 @@ def render_chambers():
                 conn.commit(); conn.close()
                 st.rerun()
 
-        # DELETE CASE
         if st.button("🗑️ Delete Current Case"):
             conn = sqlite3.connect(SQL_DB_FILE)
             conn.execute("DELETE FROM cases WHERE email=? AND case_name=?", (st.session_state.user_email, active_case))
@@ -158,7 +155,6 @@ def render_chambers():
             if send_email_report(st.session_state.user_email, st.session_state.active_case, hist):
                 st.success("Sent!")
 
-    # --- QUICK ACTIONS ---
     st.header(f"💼 Chambers: {st.session_state.active_case}")
     c1, c2, c3 = st.columns(3)
     quick_q = None
@@ -167,12 +163,10 @@ def render_chambers():
     if c3.button("📝 Summarize"): quick_q = "Summarize the case history."
     st.divider()
 
-    # Chat Display
     history = db_load_history(st.session_state.user_email, st.session_state.active_case)
     for m in history:
         with st.chat_message(m["role"]): st.write(m["content"])
 
-    # Inputs
     m_col, i_col = st.columns([1, 8])
     with m_col: voice_in = speech_to_text(language=lang_code, key='mic', just_once=True)
     with i_col: text_in = st.chat_input("Consult Alpha Apex...")
@@ -183,24 +177,44 @@ def render_chambers():
         with st.chat_message("user"): st.write(query)
         
         with st.chat_message("assistant"):
-            with st.spinner("Analyzing Law..."):
-                try:
-                    prompt = f"Expert Lawyer. Respond in {target_lang}. Query: {query}"
-                    response = load_llm().invoke(prompt).content
-                    st.write(response)
-                    db_save_message(st.session_state.user_email, st.session_state.active_case, "assistant", response)
-                    play_voice_js(response, lang_code)
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error: {e}")
+            try:
+                prompt = f"Expert Lawyer. Respond in {target_lang}. Query: {query}"
+                response = load_llm().invoke(prompt).content
+                st.write(response)
+                db_save_message(st.session_state.user_email, st.session_state.active_case, "assistant", response)
+                play_voice_js(response, lang_code)
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error: {e}")
 
 def render_library():
     st.header("📚 Legal Library")
     st.info("Browse Pakistan Penal Code (PPC) and Constitution.")
 
 def render_about():
-    st.header("ℹ️ About")
-    st.write("Alpha Apex: AI Justice Platform for Pakistan.")
+    st.header("ℹ️ About Alpha Apex")
+    
+    st.markdown("""
+    ### 🤖 The Chatbot
+    **Alpha Apex** is a specialized Legal AI Assistant designed for the Pakistani legal landscape. 
+    It leverages advanced Large Language Models to provide instant preliminary legal observations, 
+    summarize complex case facts, and offer procedural guidance based on the **Pakistan Penal Code (PPC)** and the **Constitution of Pakistan**. Available in multiple regional languages including Urdu, Sindhi, 
+    Punjabi, Pashto, and Balochi.
+    
+    ---
+    ### 👥 Our Team
+    Meet the developers and legal tech enthusiasts behind Alpha Apex:
+    """)
+
+    team = [
+        {"Name": "Saim Ahmed", "Contact": "03700297696", "Email": "saimahmed.work733@gmail.com"},
+        {"Name": "Huzaifa Khan", "Contact": "03102526567", "Email": "m.huzaifa.khan471@gmail.com"},
+        {"Name": "Mustafa Khan", "Contact": "03460222290", "Email": "muhammadmustafakhan430@gmail.com"},
+        {"Name": "Ibrahim Sohail", "Contact": "03212046403", "Email": "ibrahimsohailkhan10@gmail.com"},
+        {"Name": "Daniyal Faraz", "Contact": "03333502530", "Email": "daniyalfarazkhan2012@gmail.com"},
+    ]
+
+    st.table(team)
 
 # ==============================================================================
 # 4. MAIN FLOW
