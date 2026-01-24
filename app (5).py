@@ -242,7 +242,7 @@ else:
         st.divider()
 
         # 3. Navigation
-        nav = st.radio("Navigation", ["Consultation Chambers", "Digital Library", "About Alpha Apex"])
+        nav = st.radio("Navigation", ["Consultation Chambers", "Law Library", "About Alpha Apex"])
         
         st.divider()
         if st.button("🚪 Logout"):
@@ -260,3 +260,4 @@ else:
             {"Name": "Daniyal Faraz", "Designation": "Debugger", "Email": "daniyalfarazkhan2012@gmail.com"},
             {"Name": "Muhammad Mustafa Khan", "Designation": "Prompt Engineer", "Email": "muhammadmustafakhan430@gmail.com"}
         ])
+
