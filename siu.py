@@ -6,12 +6,12 @@ import streamlit as st
 import sqlite3
 import datetime
 import smtplib
+import time  # Added for TTS synchronization
 import streamlit.components.v1 as components
 from langchain_google_genai import ChatGoogleGenerativeAI
 from streamlit_mic_recorder import speech_to_text
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import smtplib
 
 # ==============================================================================
 # 1. INITIALIZATION & DATABASE
@@ -79,8 +79,16 @@ def load_llm():
     )
 
 def play_voice_js(text, lang_code):
-    safe_text = text.replace("'", "").replace('"', "").replace("\n", " ").strip()
-    js_code = f"<script>window.speechSynthesis.cancel(); var msg = new SpeechSynthesisUtterance('{safe_text}'); msg.lang = '{lang_code}'; window.speechSynthesis.speak(msg);</script>"
+    # Fixed: Better escaping to prevent JavaScript syntax errors
+    safe_text = text.replace("'", "\\'").replace('"', '\\"').replace("\n", " ").strip()
+    js_code = f"""
+        <script>
+            window.speechSynthesis.cancel(); 
+            var msg = new SpeechSynthesisUtterance('{safe_text}'); 
+            msg.lang = '{lang_code}'; 
+            window.speechSynthesis.speak(msg);
+        </script>
+    """
     components.html(js_code, height=0)
 
 # ==============================================================================
@@ -94,7 +102,6 @@ def render_chambers():
         target_lang = st.selectbox("🌐 Language", list(langs.keys()))
         lang_code = langs[target_lang]
 
-        # --- DYNAMIC SYSTEM CONFIGURATION ---
         st.divider()
         st.subheader("🏛️ System Configuration")
         with st.expander("Custom Instructions & Behavior", expanded=True):
@@ -133,12 +140,10 @@ def render_chambers():
 
     st.header(f"💼 Chambers: {st.session_state.active_case}")
     
-    # History Display
     history = db_load_history(st.session_state.user_email, st.session_state.active_case)
     for m in history:
         with st.chat_message(m["role"]): st.write(m["content"])
 
-    # Voice and Text Inputs
     m_col, i_col = st.columns([1, 8])
     with m_col: voice_in = speech_to_text(language=lang_code, key='mic', just_once=True)
     with i_col: text_in = st.chat_input("Start legal consultation...")
@@ -150,7 +155,6 @@ def render_chambers():
         
         with st.chat_message("assistant"):
             try:
-                # Building the dynamic IRAC System Prompt
                 irac_style = """
                 Structure your response strictly using the IRAC method:
                 - ISSUE: Clearly state the legal question.
@@ -169,7 +173,10 @@ def render_chambers():
                 response = load_llm().invoke(f"{full_system_prompt}\n\nClient Query: {query}").content
                 st.markdown(response)
                 db_save_message(st.session_state.user_email, st.session_state.active_case, "assistant", response)
+                
+                # --- TTS Trigger ---
                 play_voice_js(response, lang_code)
+                time.sleep(1) # Give browser a moment to initialize audio before rerun
                 st.rerun()
             except Exception as e:
                 st.error(f"Error: {e}")
@@ -212,8 +219,3 @@ else:
     if page == "Chambers": render_chambers()
     elif page == "Legal Library": render_library()
     else: render_about()
-
-
-
-
-
