@@ -191,12 +191,12 @@ if not st.session_state.logged_in:
         conn = sqlite3.connect(SQL_DB_FILE)
         conn.execute("INSERT OR IGNORE INTO cases (email, case_name, created_at) VALUES (?,?,?)", (email, "General", "2026-01-24"))
         conn.commit(); conn.close(); st.rerun()
-else:
+elif:
     page = st.sidebar.radio("Nav", ["Chambers", "Library", "About"])
     if page == "Chambers": render_chambers()
     elif page == "Library": st.header("📚 Library")
-    else: st.header("ℹ️ About")
-    def render_about():
+else:
+   
     st.header("ℹ️ About Alpha Apex")
     
     # 1. Mission Statement or Description
@@ -223,4 +223,6 @@ else:
 
     # 3. Version Info
     st.caption("Alpha Apex v5.0 | Last Updated: January 2026")
+        
+
 
