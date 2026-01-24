@@ -70,7 +70,7 @@ def play_voice_js(text):
     safe_text = text.replace('\\', '\\\\').replace("'", "\\'").replace('"', '\\"').replace("\n", " ").strip()
     js_code = f"""
     <div style="background: #f1f5f9; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 20px;">
-        <button onclick="window.speakNow()">▶ Play English Audio</button>
+        <button onclick="window.speakNow()">▶ Play Audio</button>
         <button onclick="window.speechSynthesis.cancel()">⏹ Stop</button>
     </div>
     <script>
@@ -183,3 +183,4 @@ else:
     page = st.sidebar.radio("Nav", ["Chambers", "About"])
     if page == "Chambers": render_chambers()
     else: st.write("Legal AI developed for Pakistan.")
+
