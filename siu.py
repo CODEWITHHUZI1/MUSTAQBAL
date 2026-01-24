@@ -17,7 +17,7 @@ from email.mime.multipart import MIMEMultipart
 # ==============================================================================
 st.set_page_config(page_title="Alpha Apex", page_icon="⚖️", layout="wide")
 API_KEY = st.secrets["GEMINI_API_KEY"]
-SQL_DB_FILE = "advocate_ai_v12.db"
+SQL_DB_FILE = "advocate_ai_v14.db"
 
 def init_sql_db():
     conn = sqlite3.connect(SQL_DB_FILE)
@@ -49,7 +49,7 @@ def db_load_history(email, case_name):
 init_sql_db()
 
 # ==============================================================================
-# 2. EMAIL & VOICE UTILITIES (TTS FOR ENGLISH ONLY)
+# 2. EMAIL & VOICE UTILITIES (TTS FOR ENGLISH ONLY WITH SPEED CONTROL)
 # ==============================================================================
 def send_email_report(receiver_email, case_name, history):
     try:
@@ -66,24 +66,26 @@ def send_email_report(receiver_email, case_name, history):
         return True
     except: return False
 
-def play_voice_js(text):
+def play_voice_js(text, speed):
     safe_text = text.replace('\\', '\\\\').replace("'", "\\'").replace('"', '\\"').replace("\n", " ").strip()
     js_code = f"""
-    <div style="background: #f1f5f9; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 20px;">
-        <button onclick="window.speakNow()">▶ Play Audio</button>
-        <button onclick="window.speechSynthesis.cancel()">⏹ Stop</button>
+    <div style="background: #f1f5f9; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 20px; font-family: sans-serif;">
+        <span style="font-size: 0.85rem; font-weight: bold; color: #334155;">🔊 English Audio Output ({speed}x)</span><br>
+        <button onclick="window.speakNow()" style="margin-top:8px; cursor:pointer;">▶ Play</button>
+        <button onclick="window.speechSynthesis.cancel()" style="margin-top:8px; cursor:pointer; color:red;">⏹ Stop</button>
     </div>
     <script>
         window.speakNow = function() {{
             window.speechSynthesis.cancel();
             var msg = new SpeechSynthesisUtterance("{safe_text}");
             msg.lang = 'en-US';
+            msg.rate = {speed};
             window.speechSynthesis.speak(msg);
         }};
         window.speakNow();
     </script>
     """
-    components.html(js_code, height=70)
+    components.html(js_code, height=95)
 
 # ==============================================================================
 # 3. CHAMBERS
@@ -91,15 +93,19 @@ def play_voice_js(text):
 def render_chambers():
     langs = {"English": "en-US", "Urdu": "ur-PK", "Sindhi": "sd-PK", "Punjabi": "pa-PK", "Pashto": "ps-PK", "Balochi": "bal-PK"}
     
-    # SIDEBAR FEATURES INTACT
+    # SIDEBAR
     with st.sidebar:
         st.title("⚖️ Alpha Apex")
-        target_lang = st.selectbox("🌐 Language", list(langs.keys()))
+        target_lang = st.selectbox("🌐 Display Language", list(langs.keys()))
         
         st.divider()
-        st.subheader("🏛️ Configuration")
-        sys_persona = st.text_input("Persona:", value="You are a Pakistani Law Analyst.")
+        st.subheader("🏛️ AI Configuration")
+        sys_persona = st.text_input("Core Persona:", value="You are a Pakistani Law Analyst.")
         use_irac = st.toggle("Enable IRAC structure", value=True)
+        
+        # SPEED ADJUSTER ADDED HERE
+        st.subheader("🎙️ Voice Settings")
+        voice_speed = st.slider("Speech Rate (Speed)", 0.5, 2.0, 1.0, 0.1)
         
         st.divider()
         st.subheader("📁 Case Management")
@@ -146,7 +152,7 @@ def render_chambers():
         db_save_message(st.session_state.user_email, active_case, "user", query)
         
         try:
-            # GEMINI 2.5 FLASH DEFINED
+            # GEMINI 2.5 FLASH
             llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=API_KEY)
             
             irac_text = "Structure response with Issue, Rule, Analysis, Conclusion." if use_irac else ""
@@ -154,21 +160,20 @@ def render_chambers():
             
             response = llm.invoke(prompt).content
             db_save_message(st.session_state.user_email, active_case, "assistant", response)
-            
-            # TRIGGER RERUN TO SHOW HISTORY + TRIGGER TTS
             st.rerun()
             
         except Exception as e:
             st.error(f"Gemini 2.5 Error: {e}")
 
-    # TTS GATEKEEPER
+    # TTS GATEKEEPER: STRICTLY ENGLISH ONLY
     if history and history[-1]["role"] == "assistant" and target_lang == "English":
         if st.session_state.get("last_spoken") != history[-1]["content"]:
-            play_voice_js(history[-1]["content"])
+            # PASSES SPEED TO THE JS ENGINE
+            play_voice_js(history[-1]["content"], voice_speed)
             st.session_state.last_spoken = history[-1]["content"]
 
 # ==============================================================================
-# 4. NAVIGATION
+# 4. NAVIGATION & LOGIN
 # ==============================================================================
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 if not st.session_state.logged_in:
@@ -183,4 +188,3 @@ else:
     page = st.sidebar.radio("Nav", ["Chambers", "About"])
     if page == "Chambers": render_chambers()
     else: st.write("Legal AI developed for Pakistan.")
-
