@@ -1,9 +1,5 @@
 import streamlit as st
-import os
 import sqlite3
-import glob
-import time
-import json
 import smtplib
 from datetime import datetime
 from email.mime.text import MIMEText
@@ -68,7 +64,6 @@ def db_create_case(email, case_name):
     conn.commit()
     conn.close()
 
-# FIX: Corrected variable usage for Email
 def send_email_report(receiver_email, case_name, content):
     try:
         sender_email = st.secrets["EMAIL_USER"]
@@ -85,8 +80,7 @@ def send_email_report(receiver_email, case_name, content):
         server.send_message(msg)
         server.quit()
         return True
-    except Exception as e:
-        print(f"SMTP Error: {e}")
+    except:
         return False
 
 init_sql_db()
@@ -95,39 +89,28 @@ init_sql_db()
 # 2. AI & VOICE CONTROLLER
 # ==============================================================================
 
-from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import Chroma
+from langchain_google_genai import ChatGoogleGenerativeAI
 from streamlit_mic_recorder import speech_to_text
 
 st.set_page_config(page_title="Alpha Apex", page_icon="⚖️", layout="wide")
 
-# FIX: CSS for Bottom Left Mic
 st.markdown("""
     <style>
-    .mic-fixed-container {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        justify-content: flex-end;
-        padding: 5px;
-    }
+    .mic-fixed-container { display: flex; flex-direction: column; align-items: flex-start; padding: 5px; }
     .mic-label { font-size: 12px; font-weight: bold; color: #1E3A8A; margin-bottom: 2px; }
     </style>
 """, unsafe_allow_html=True)
 
+# LOAD SECRETS
 API_KEY = st.secrets["GEMINI_API_KEY"]
-MODEL_NAME = "gemini-1.5-flash"
 
-# FIX: Voice buttons now call global Synthesis directly to prevent state loss
 def play_voice_js(text, lang_code):
     safe_text = text.replace("'", "").replace('"', "").replace("\n", " ").strip()
     js_code = f"""
         <div style="background: #ffffff; padding: 10px; border-radius: 10px; border: 2px solid #1E3A8A; display: flex; gap: 8px; align-items: center; margin-bottom: 10px;">
-            <button onclick="window.speechSynthesis.pause()" style="cursor:pointer; padding:5px 10px; border-radius:4px; border:1px solid #ccc; background: #fff;">⏸ Pause</button>
-            <button onclick="window.speechSynthesis.resume()" style="cursor:pointer; padding:5px 10px; border-radius:4px; border:1px solid #ccc; background: #fff;">▶️ Resume</button>
-            <button onclick="window.speechSynthesis.cancel()" style="cursor:pointer; padding:5px 10px; border-radius:4px; border:1px solid #ccc; background: #fef2f2; color:red;">⏹ Stop</button>
+            <button onclick="window.speechSynthesis.pause()" style="cursor:pointer; padding:5px 10px; border:1px solid #ccc; background: #fff;">⏸ Pause</button>
+            <button onclick="window.speechSynthesis.resume()" style="cursor:pointer; padding:5px 10px; border:1px solid #ccc; background: #fff;">▶️ Resume</button>
+            <button onclick="window.speechSynthesis.cancel()" style="cursor:pointer; padding:5px 10px; border:1px solid #ccc; background: #fef2f2; color:red;">⏹ Stop</button>
         </div>
         <script>
             window.speechSynthesis.cancel();
@@ -140,11 +123,20 @@ def play_voice_js(text, lang_code):
 
 @st.cache_resource
 def load_models():
-    llm = ChatGoogleGenerativeAI(model=MODEL_NAME, temperature=0.3, google_api_key=API_KEY)
-    embed = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=API_KEY)
-    return llm, embed
+    # RELAXED SAFETY SETTINGS TO AVOID BLOCKED RESPONSES
+    return ChatGoogleGenerativeAI(
+        model="gemini-1.5-flash",
+        google_api_key=API_KEY,
+        temperature=0.2,
+        safety_settings={
+            "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
+            "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
+            "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE",
+            "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE",
+        }
+    )
 
-ai_engine, vector_embedder = load_models()
+ai_engine = load_models()
 
 # ==============================================================================
 # 3. CHAMBERS UI
@@ -165,43 +157,31 @@ def render_chambers_page():
 
     with st.sidebar:
         st.title("👨‍⚖️ Alpha Apex")
-        st.session_state.target_lang = st.selectbox("🌐 Language", list(langs.keys()), 
-                                                   index=list(langs.keys()).index(st.session_state.target_lang))
+        st.session_state.target_lang = st.selectbox("🌐 Language", list(langs.keys()), index=list(langs.keys()).index(st.session_state.target_lang))
         st.divider()
-        st.subheader("📁 Case Files")
         sel = st.selectbox("Switch Case", cases, index=cases.index(st.session_state.active_case))
         if sel != st.session_state.active_case:
             st.session_state.active_case = sel
             st.rerun()
-            
         if st.button("➕ New Case"):
             db_create_case(st.session_state.user_email, f"Consultation {len(cases)+1}")
             st.rerun()
-
         st.divider()
         history = db_load_history(st.session_state.user_email, st.session_state.active_case)
         if st.button("🕒 Extract Timeline"):
             if history:
                 st.session_state.report = ai_engine.invoke(f"Extract timeline from: {history}").content
                 st.info(st.session_state.report)
-            
         if "report" in st.session_state and st.button("📧 Email to Me"):
-            # FIX: Added success indicator
             if send_email_report(st.session_state.user_email, st.session_state.active_case, st.session_state.report):
-                st.sidebar.success("✅ Email Dispatched!")
-            else:
-                st.sidebar.error("❌ Email Failed. Check App Password.")
+                st.sidebar.success("✅ Email Sent!")
+            else: st.sidebar.error("❌ Email Failed.")
 
     st.header(f"💼 Case: {st.session_state.active_case}")
     t1, t2, _ = st.columns([1, 1, 5])
-    if t1.button("🇺🇸 English"): 
-        st.session_state.target_lang = "English"
-        st.rerun()
-    if t2.button("🇵🇰 Urdu"): 
-        st.session_state.target_lang = "Urdu"
-        st.rerun()
+    if t1.button("🇺🇸 English"): st.session_state.target_lang = "English"; st.rerun()
+    if t2.button("🇵🇰 Urdu"): st.session_state.target_lang = "Urdu"; st.rerun()
 
-    # Chat Log
     for m in history:
         with st.chat_message(m["role"]): st.write(m["content"])
 
@@ -210,12 +190,12 @@ def render_chambers_page():
     quick_q = None
     if q1.button("🧠 Infer Path"): quick_q = "What is the recommended legal path?"
     if q2.button("📜 Give Ruling"): quick_q = "Provide a preliminary judicial observation."
-    if q3.button("📝 Summarize"): quick_q = "Summarize the legal facts discussed."
+    if q3.button("📝 Summarize"): quick_q = "Summarize the legal facts."
 
     if "latest_voice_text" in st.session_state:
         play_voice_js(st.session_state.latest_voice_text, st.session_state.latest_voice_lang)
 
-    # FIX: Mic on Bottom Left
+    # MIC ON BOTTOM LEFT (As requested)
     m_col, _ = st.columns([2, 8])
     with m_col:
         st.markdown('<div class="mic-fixed-container"><div class="mic-label">🎙️ Speak Here</div>', unsafe_allow_html=True)
@@ -227,29 +207,24 @@ def render_chambers_page():
     final_q = quick_q or voice_in or text_in
     if final_q:
         db_save_message(st.session_state.user_email, st.session_state.active_case, "user", final_q)
-        prompt = f"You are a legal expert. You MUST respond ONLY in the {st.session_state.target_lang} language. User says: {final_q}"
-        ans = ai_engine.invoke(prompt).content
-        db_save_message(st.session_state.user_email, st.session_state.active_case, "assistant", ans)
-        
-        st.session_state.latest_voice_text = ans
-        st.session_state.latest_voice_lang = langs[st.session_state.target_lang]
+        prompt = f"You are a professional legal expert. Respond ONLY in {st.session_state.target_lang}. User: {final_q}"
+        try:
+            ans = ai_engine.invoke(prompt).content
+            db_save_message(st.session_state.user_email, st.session_state.active_case, "assistant", ans)
+            st.session_state.latest_voice_text = ans
+            st.session_state.latest_voice_lang = langs[st.session_state.target_lang]
+        except Exception as e:
+            st.error("The AI Service is currently unavailable. Please check your internet or API Key.")
         st.rerun()
 
-# ==============================================================================
-# 4. LOGIN & MAIN
-# ==============================================================================
-
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
-
 if not st.session_state.logged_in:
     st.title("⚖️ Alpha Apex AI")
-    email = st.text_input("Enter Email to Access Chambers")
+    email = st.text_input("Enter Email")
     if st.button("Login"):
         if "@" in email:
             st.session_state.logged_in = True
             st.session_state.user_email = email
-            st.session_state.username = email.split("@")[0].capitalize()
-            db_register_user(email, st.session_state.username)
+            db_register_user(email, email.split("@")[0].capitalize())
             st.rerun()
-else:
-    render_chambers_page()
+else: render_chambers_page()
