@@ -14,7 +14,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ==============================================================================
-# 1. INITIALIZATION & DATABASE
+# 1. INITIALIZATION & DATABASE (REMAINING SAME)
 # ==============================================================================
 st.set_page_config(page_title="Alpha Apex", page_icon="⚖️", layout="wide")
 API_KEY = st.secrets["GEMINI_API_KEY"]
@@ -51,7 +51,7 @@ def db_load_history(email, case_name):
 init_sql_db()
 
 # ==============================================================================
-# 2. CORE UTILITIES
+# 2. CORE UTILITIES & VOICE CONTROL HUB
 # ==============================================================================
 def send_email_report(receiver_email, case_name, history):
     try:
@@ -78,27 +78,57 @@ def load_llm():
         safety_settings={"HARM_CATEGORY_HARASSMENT": "BLOCK_NONE", "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE", "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE", "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE"}
     )
 
+# --- THE NEW VOICE CONTROL INTERFACE ---
 def play_voice_js(text, lang_code):
     safe_text = text.replace('\\', '\\\\').replace("'", "\\'").replace('"', '\\"').replace("\n", " ").strip()
     js_code = f"""
-        <script>
-            function speak() {{
+    <div style="background: #f0f2f6; padding: 10px; border-radius: 10px; border: 1px solid #dcdfe3; margin-top: 10px; font-family: sans-serif;">
+        <p style="margin: 0 0 10px 0; font-size: 0.8rem; color: #555;">🔊 Voice Controls</p>
+        <button onclick="window.speechSynthesis.resume()" style="padding: 5px 10px; cursor: pointer;">Play</button>
+        <button onclick="window.speechSynthesis.pause()" style="padding: 5px 10px; cursor: pointer;">Pause</button>
+        <button onclick="window.speechSynthesis.cancel()" style="padding: 5px 10px; cursor: pointer; background: #ff4b4b; color: white; border: none; border-radius: 3px;">Stop</button>
+        
+        <label style="margin-left: 10px; font-size: 0.8rem;">Speed: </label>
+        <select id="speedSel" onchange="changeSpeed(this.value)" style="padding: 3px;">
+            <option value="0.5">0.5x</option>
+            <option value="1" selected>1.0x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2.0x</option>
+        </select>
+    </div>
+
+    <script>
+        var msg = new SpeechSynthesisUtterance("{safe_text}");
+        msg.lang = "{lang_code}";
+        var currentSpeed = 1;
+
+        function changeSpeed(val) {{
+            currentSpeed = parseFloat(val);
+            if (window.speechSynthesis.speaking) {{
                 window.speechSynthesis.cancel();
-                var msg = new SpeechSynthesisUtterance("{safe_text}");
-                msg.lang = "{lang_code}";
-                msg.rate = 0.9; 
-                var voices = window.speechSynthesis.getVoices();
-                if ("{lang_code}".startsWith('ur')) {{
-                    var targetVoice = voices.find(v => v.lang.startsWith('ur')) || voices.find(v => v.lang.startsWith('hi'));
-                    if (targetVoice) msg.voice = targetVoice;
-                }}
+                msg.rate = currentSpeed;
                 window.speechSynthesis.speak(msg);
             }}
-            if (window.speechSynthesis.onvoiceschanged !== undefined) {{ window.speechSynthesis.onvoiceschanged = speak; }}
-            speak();
-        </script>
+        }}
+
+        function initSpeak() {{
+            window.speechSynthesis.cancel();
+            msg.rate = currentSpeed;
+            var voices = window.speechSynthesis.getVoices();
+            if ("{lang_code}".startsWith('ur')) {{
+                var v = voices.find(v => v.lang.startsWith('ur')) || voices.find(v => v.lang.startsWith('hi'));
+                if (v) msg.voice = v;
+            }}
+            window.speechSynthesis.speak(msg);
+        }}
+
+        if (window.speechSynthesis.onvoiceschanged !== undefined) {{
+            window.speechSynthesis.onvoiceschanged = initSpeak;
+        }}
+        initSpeak();
+    </script>
     """
-    components.html(js_code, height=0)
+    components.html(js_code, height=100)
 
 # ==============================================================================
 # 3. CHAMBERS
@@ -130,23 +160,18 @@ def render_chambers():
 
     st.header(f"💼 Chambers: {st.session_state.active_case}")
 
-    # --- REVOLUTIONARY UI LAYOUT ---
-    # 1. First, we create the container for history (THIS IS ABOVE THE INPUT)
     chat_container = st.container()
 
-    # 2. Then, we create the area for the Prompt Input (THIS IS AT THE BOTTOM)
     st.divider()
     m_col, i_col = st.columns([1, 8])
     with m_col: voice_in = speech_to_text(language=lang_code, key='mic', just_once=True)
     with i_col: text_in = st.chat_input("Start legal consultation...")
 
-    # 3. Load history into the TOP container
     history = db_load_history(st.session_state.user_email, st.session_state.active_case)
     with chat_container:
         for m in history:
             with st.chat_message(m["role"]): st.write(m["content"])
 
-    # 4. Handle Logic
     query = voice_in or text_in
     if query:
         db_save_message(st.session_state.user_email, st.session_state.active_case, "user", query)
@@ -159,7 +184,7 @@ def render_chambers():
         except Exception as e:
             st.error(f"Error: {e}")
 
-    # Speech logic (Triggered after rerun)
+    # Voice Trigger (Shows Control Hub above prompt area)
     if history and history[-1]["role"] == "assistant":
         if st.session_state.last_spoken != history[-1]["content"]:
             play_voice_js(history[-1]["content"], lang_code)
