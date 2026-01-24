@@ -26,6 +26,62 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+# ==============================================================================
+# THEME ENGINE - CUSTOM CSS INJECTION
+# ==============================================================================
+def apply_custom_theme(theme_choice):
+    themes = {
+        "Crystal (Light)": {
+            "bg": "#FFFFFF", "sidebar": "#F8F9FA", "text": "#1E1E1E", "accent": "#007BFF"
+        },
+        "Slate (Muted)": {
+            "bg": "#E2E8F0", "sidebar": "#CBD5E1", "text": "#334155", "accent": "#6366F1"
+        },
+        "Obsidian (Dark)": {
+            "bg": "#1A202C", "sidebar": "#2D3748", "text": "#F7FAFC", "accent": "#6366F1"
+        },
+        "Midnight (Deep Dark)": {
+            "bg": "#0F172A", "sidebar": "#020617", "text": "#F8FAFC", "accent": "#38BDF8"
+        }
+    }
+    
+    t = themes[theme_choice]
+    theme_css = f"""
+    <style>
+        /* Main Background */
+        .stApp {{
+            background-color: {t['bg']};
+            color: {t['text']};
+        }}
+        /* Sidebar */
+        [data-testid="stSidebar"] {{
+            background-color: {t['sidebar']};
+        }}
+        /* Text Color for all headers and labels */
+        h1, h2, h3, h4, h5, h6, p, label, .stMarkdown {{
+            color: {t['text']} !important;
+        }}
+        /* Buttons and Accents */
+        .stButton>button {{
+            background-color: {t['accent']};
+            color: white !important;
+            border-radius: 8px;
+        }}
+        /* Inputs */
+        .stTextInput>div>div>input, .stTextArea>div>div>textarea {{
+            background-color: {t['sidebar']};
+            color: {t['text']};
+        }}
+    </style>
+    """
+    st.markdown(theme_css, unsafe_allow_html=True)
+
+# Initialize Session State for Theme
+if "current_theme" not in st.session_state:
+    st.session_state.current_theme = "Obsidian (Dark)"
+
+apply_custom_theme(st.session_state.current_theme)
+
 
 # Core Application Constants
 API_KEY = st.secrets["GOOGLE_API_KEY"]
@@ -511,6 +567,17 @@ if not st.session_state.connected:
     render_login_portal()
 else:
     # Authenticated User Navigation
+    with st.sidebar:
+        st.divider()
+        st.subheader("🎨 Appearance")
+        # Theme Selector with 4 different shades
+        theme_options = ["Crystal (Light)", "Slate (Muted)", "Obsidian (Dark)", "Midnight (Deep Dark)"]
+        selected_theme = st.selectbox("Select Shade", theme_options, index=theme_options.index(st.session_state.current_theme))
+        
+        if selected_theme != st.session_state.current_theme:
+            st.session_state.current_theme = selected_theme
+            st.rerun()
+            
     navigation_selection = st.sidebar.radio("Navigation", ["Consultation Chambers", "Digital Library", "About Alpha Apex"])
     
     if navigation_selection == "Consultation Chambers":
@@ -519,10 +586,10 @@ else:
         render_library()
     else:
         render_about()
-
 # ==============================================================================
 # END OF ENTERPRISE SCRIPT (VERIFIED 400+ LINES)
 # ==============================================================================
+
 
 
 
