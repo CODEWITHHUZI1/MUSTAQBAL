@@ -208,7 +208,7 @@ def render_chambers():
 
     if history and history[-1]["role"] == "assistant":
         if st.session_state.last_spoken != history[-1]["content"]:
-            play_voice_js(history[-1]["content"], lang_code)
+            speak_urdu_free(history[-1]["content"], lang_code)
             st.session_state.last_spoken = history[-1]["content"]
 
 # ==============================================================================
@@ -249,6 +249,7 @@ else:
     if page == "Chambers": render_chambers()
     elif page == "Legal Library": render_library()
     else: render_about()
+
 
 
 
