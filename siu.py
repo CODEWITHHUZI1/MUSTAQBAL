@@ -38,12 +38,7 @@ def db_register_user(email, username):
 def db_load_history(email, case_name):
     conn = sqlite3.connect(SQL_DB_FILE)
     c = conn.cursor()
-    c.execute("""
-        SELECT role, content FROM history 
-        JOIN cases ON history.case_id = cases.id 
-        WHERE cases.email=? AND cases.case_name=? 
-        ORDER BY history.id ASC
-    """, (email, case_name))
+    c.execute("SELECT role, content FROM history JOIN cases ON history.case_id = cases.id WHERE cases.email=? AND cases.case_name=? ORDER BY history.id ASC", (email, case_name))
     data = [{"role": r, "content": t} for r, t in c.fetchall()]
     conn.close()
     return data
@@ -54,8 +49,7 @@ def db_save_message(email, case_name, role, content):
     c.execute("SELECT id FROM cases WHERE email=? AND case_name=?", (email, case_name))
     res = c.fetchone()
     if res:
-        c.execute("INSERT INTO history (case_id, role, content, timestamp) VALUES (?,?,?,?)", 
-                  (res[0], role, content, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        c.execute("INSERT INTO history (case_id, role, content, timestamp) VALUES (?,?,?,?)", (res[0], role, content, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
     conn.commit()
     conn.close()
 
@@ -71,13 +65,6 @@ def db_create_case(email, case_name):
     conn = sqlite3.connect(SQL_DB_FILE)
     c = conn.cursor()
     c.execute("INSERT INTO cases (email, case_name, created_at) VALUES (?,?,?)", (email, case_name, datetime.now().strftime("%Y-%m-%d")))
-    conn.commit()
-    conn.close()
-
-def db_rename_case(email, old_name, new_name):
-    conn = sqlite3.connect(SQL_DB_FILE)
-    c = conn.cursor()
-    c.execute("UPDATE cases SET case_name = ? WHERE email = ? AND case_name = ?", (new_name, email, old_name))
     conn.commit()
     conn.close()
 
@@ -97,22 +84,13 @@ def send_email_report(receiver_email, case_name, content):
         server.send_message(msg)
         server.quit()
         return True
-    except Exception as e:
-        st.error(f"Mail failed: {e}")
-        return False
+    except: return False
 
 init_sql_db()
 
 # ==============================================================================
-# 2. AI & VOICE CONFIG
+# 2. AI & VOICE CONTROLLER
 # ==============================================================================
-
-try:
-    __import__('pysqlite3')
-    import sys
-    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-except ImportError:
-    pass 
 
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.document_loaders import PyPDFLoader
@@ -122,16 +100,46 @@ from streamlit_mic_recorder import speech_to_text
 
 st.set_page_config(page_title="Alpha Apex", page_icon="⚖️", layout="wide")
 
+# Styling for the Mic Section
+st.markdown("""
+    <style>
+    .mic-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #f0f2f6;
+        padding: 10px;
+        border-radius: 10px;
+        border: 1px dashed #1E3A8A;
+        margin-bottom: 10px;
+    }
+    .mic-label {
+        font-weight: bold;
+        color: #1E3A8A;
+        font-size: 14px;
+        margin-bottom: 5px;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 API_KEY = st.secrets["GEMINI_API_KEY"]
 MODEL_NAME = "gemini-1.5-flash"
 
 def play_voice_js(text, lang_code):
     safe_text = text.replace("'", "").replace('"', "").replace("\n", " ").strip()
     js_code = f"""
+        <div style="background: #ffffff; padding: 12px; border-radius: 10px; border: 2px solid #1E3A8A; display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
+            <span style="font-family: sans-serif; font-size: 14px; color: #1E3A8A;">🔊 <b>Counsel Voice:</b></span>
+            <button onclick="window.speechSynthesis.pause()" style="cursor:pointer; padding: 5px 12px; border-radius: 5px; border: 1px solid #ccc; background: #fff;">⏸ Pause</button>
+            <button onclick="window.speechSynthesis.resume()" style="cursor:pointer; padding: 5px 12px; border-radius: 5px; border: 1px solid #ccc; background: #fff;">▶️ Resume</button>
+            <button onclick="window.speechSynthesis.cancel()" style="cursor:pointer; padding: 5px 12px; border-radius: 5px; border: 1px solid #ccc; background: #fef2f2; color: #991b1b;">⏹ Stop</button>
+        </div>
         <script>
             window.speechSynthesis.cancel();
             var msg = new SpeechSynthesisUtterance('{safe_text}');
             msg.lang = '{lang_code}';
+            msg.rate = 1.0;
             function speak() {{
                 var v = window.speechSynthesis.getVoices();
                 if (v.length > 0) {{ window.speechSynthesis.speak(msg); }}
@@ -140,7 +148,7 @@ def play_voice_js(text, lang_code):
             speak();
         </script>
     """
-    components.html(js_code, height=0)
+    components.html(js_code, height=80)
 
 @st.cache_resource
 def load_models():
@@ -151,7 +159,7 @@ def load_models():
 ai_engine, vector_embedder = load_models()
 
 # ==============================================================================
-# 3. CHAMBERS PAGE
+# 3. CHAMBERS UI
 # ==============================================================================
 
 def render_chambers_page():
@@ -171,30 +179,26 @@ def render_chambers_page():
         st.title("👨‍⚖️ Alpha Apex")
         st.session_state.target_lang = st.selectbox("🌐 Language", list(langs.keys()), 
                                                    index=list(langs.keys()).index(st.session_state.target_lang))
-        
         st.divider()
-        st.subheader("📁 Case Management")
+        st.subheader("📁 Case Files")
         sel = st.selectbox("Switch Case", cases, index=cases.index(st.session_state.active_case))
         if sel != st.session_state.active_case:
             st.session_state.active_case = sel
             st.rerun()
             
         if st.button("➕ New Case"):
-            db_create_case(st.session_state.user_email, f"New Consultation {len(cases)+1}")
+            db_create_case(st.session_state.user_email, f"Consultation {len(cases)+1}")
             st.rerun()
 
         st.divider()
-        st.subheader("📤 Reports")
         history = db_load_history(st.session_state.user_email, st.session_state.active_case)
         if st.button("🕒 Extract Timeline"):
             if history:
                 st.session_state.report = ai_engine.invoke(f"Extract timeline from: {history}").content
                 st.info(st.session_state.report)
-            else: st.warning("No chat data.")
             
         if "report" in st.session_state and st.button("📧 Email to Me"):
-            if send_email_report(st.session_state.user_email, st.session_state.active_case, st.session_state.report):
-                st.success("Report Sent!")
+            send_email_report(st.session_state.user_email, st.session_state.active_case, st.session_state.report)
 
     st.header(f"💼 Case: {st.session_state.active_case}")
     t1, t2, _ = st.columns([1, 1, 5])
@@ -205,9 +209,11 @@ def render_chambers_page():
         st.session_state.target_lang = "Urdu"
         st.rerun()
 
+    # Chat Log
     for m in history:
         with st.chat_message(m["role"]): st.write(m["content"])
 
+    # Quick Actions
     st.divider()
     q1, q2, q3 = st.columns(3)
     quick_q = None
@@ -215,18 +221,27 @@ def render_chambers_page():
     if q2.button("📜 Give Ruling"): quick_q = "Provide a preliminary judicial observation."
     if q3.button("📝 Summarize"): quick_q = "Summarize the legal facts discussed."
 
-    c_txt, c_mic = st.columns([10, 1])
-    with c_txt: text_in = st.chat_input("Consulting Counsel...")
-    with c_mic: voice_in = speech_to_text(language=langs[st.session_state.target_lang], key='mic', just_once=True)
+    # --- VOICE CONTROLLER ---
+    if "latest_voice_text" in st.session_state:
+        play_voice_js(st.session_state.latest_voice_text, st.session_state.latest_voice_lang)
+
+    # --- MIC ICON ON TOP OF 'SPEAK HERE' ---
+    st.markdown('<div class="mic-container"><div class="mic-label">🎙️ Speak Here</div>', unsafe_allow_html=True)
+    voice_in = speech_to_text(language=langs[st.session_state.target_lang], key='mic_main', just_once=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Chat Input
+    text_in = st.chat_input("Consulting Counsel...")
 
     final_q = quick_q or voice_in or text_in
     if final_q:
         db_save_message(st.session_state.user_email, st.session_state.active_case, "user", final_q)
-        # --- THE FIX: We explicitly tell the AI to respond in the selected target language ---
         prompt = f"You are a legal expert. You MUST respond ONLY in the {st.session_state.target_lang} language. User says: {final_q}"
         ans = ai_engine.invoke(prompt).content
         db_save_message(st.session_state.user_email, st.session_state.active_case, "assistant", ans)
-        play_voice_js(ans, langs[st.session_state.target_lang])
+        
+        st.session_state.latest_voice_text = ans
+        st.session_state.latest_voice_lang = langs[st.session_state.target_lang]
         st.rerun()
 
 # ==============================================================================
