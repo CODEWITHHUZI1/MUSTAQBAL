@@ -1,5 +1,3 @@
-
-
 import streamlit as st
 import os
 import sqlite3
@@ -8,10 +6,12 @@ import time
 import pandas as pd
 import streamlit.components.v1 as components
 import json
-import re
+import rea
 from datetime import datetime
 import chromadb
 from langchain_chroma import Chroma
+from PyPDF2 import PdfReader
+
 # ==============================================================================
 # 1. SYSTEM CONFIGURATION
 # ==============================================================================
@@ -26,13 +26,12 @@ except ImportError:
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import Chroma
 from streamlit_mic_recorder import speech_to_text
 from streamlit_google_auth import Authenticate
 
 # Secure way to fetch keys on deployment
-API_KEY = st.secrets["GEMINI_API_KEY"]
-DATA_FOLDER = "data"
+API_KEY = st.secrets["GOOGLE_API_KEY"]
+DATA_FOLDER = "data" # Updated to match your lowercase folder
 DB_PATH = "./chroma_db"
 SQL_DB_FILE = "advocate_ai_v2.db"
 MODEL_NAME = "gemini-2.5-flash"
@@ -45,20 +44,14 @@ st.set_page_config(page_title="Advocate AI", page_icon="⚖️", layout="wide")
 
 st.markdown("""
     <style>
-    /* Ensure the main container has enough bottom padding so input doesn't cover text */
     .main .block-container { padding-bottom: 150px; }
-   
     .stChatMessage { border-radius: 15px; margin-bottom: 10px; border: 1px solid #eee; }
-   
-    /* Mic Alignment Fix */
     .mic-box {
         display: flex;
         align-items: center;
         justify-content: center;
         padding-top: 38px;
     }
-   
-    /* Urdu Font */
     [data-testid="stMarkdownContainer"] p {
         font-family: 'Segoe UI', 'Tahoma', sans-serif;
         font-size: 1.1rem;
@@ -161,7 +154,7 @@ def db_load_history(email, case_name):
 init_sql_db()
 
 # ==============================================================================
-# 4. AI & KNOWLEDGE
+# 4. AI & KNOWLEDGE (FIXED SYNC)
 # ==============================================================================
 
 @st.cache_resource
@@ -174,8 +167,9 @@ ai_engine, vector_embedder = load_models()
 
 def sync_knowledge_base():
     if not os.path.exists(DATA_FOLDER): os.makedirs(DATA_FOLDER)
-    pdfs = glob.glob(f"{DATA_FOLDER}/*.pdf")
+    pdfs = glob.glob(f"{DATA_FOLDER}/*.pdf") + glob.glob(f"{DATA_FOLDER}/*.PDF")
     if not pdfs: return None, "No PDFs."
+   
     if os.path.exists(DB_PATH):
         return Chroma(persist_directory=DB_PATH, embedding_function=vector_embedder), "Connected."
     else:
@@ -193,22 +187,16 @@ if "law_db" not in st.session_state:
 # 5. AUTH
 # ==============================================================================
 
-# 1. Create the physical file on the server from secrets
 try:
     config_dict = dict(st.secrets["google_auth"])
-    # Wrap in "web" as required by the underlying Google library
     secret_data = {"web": config_dict}
-   
     with open('client_secret.json', 'w') as f:
         json.dump(secret_data, f)
-       
     my_uri = config_dict['redirect_uris'][0]
 except KeyError:
     st.error("Missing 'google_auth' in Streamlit Secrets!")
     st.stop()
 
-# 2. Positional Arguments: (path, uri, cookie_name, key, expiry)
-# This format avoids "unexpected keyword argument" errors
 authenticator = Authenticate(
     'client_secret.json',
     my_uri,
@@ -237,12 +225,12 @@ def login_page():
                         st.session_state.username = e.split("@")[0].title()
                         db_register_user(e, st.session_state.username)
                         st.rerun()
+
 # ==============================================================================
-# 6. CHAMBERS PAGE (FIXED LAYOUT)
+# 6. CHAMBERS PAGE
 # ==============================================================================
 
 def render_chambers_page():
-    # 1. Sidebar Logic
     with st.sidebar:
         st.header(f"👨‍⚖️ {st.session_state.username}")
         cases = db_get_cases(st.session_state.user_email)
@@ -270,14 +258,12 @@ def render_chambers_page():
 
     st.title(f"⚖️ {st.session_state.active_case}")
 
-    # 2. Chat History Block (ALWAYS ABOVE INPUT)
     history_container = st.container()
     with history_container:
         history = db_load_history(st.session_state.user_email, st.session_state.active_case)
         for msg in history:
             with st.chat_message(msg["role"]): st.markdown(msg["content"])
 
-    # 3. Input Tools Block (STAYS AT THE BOTTOM)
     input_placeholder = st.container()
     with input_placeholder:
         c_text, c_mic = st.columns([10, 1])
@@ -288,13 +274,11 @@ def render_chambers_page():
             voice_in = speech_to_text(language='ur-PK', start_prompt="🎤", stop_prompt="⏹️", key='mic_chambers', just_once=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
-    # 4. Logic Handling
     final_in = voice_in if voice_in else text_in
     is_v = True if voice_in else False
 
     if final_in:
         db_save_message(st.session_state.user_email, st.session_state.active_case, "user", final_in)
-        # Append immediately to history container
         with history_container:
             with st.chat_message("user"): st.markdown(final_in)
             with st.chat_message("assistant"):
@@ -317,33 +301,21 @@ def render_chambers_page():
                 except Exception as e: st.error(f"Error: {e}")
 
 # ==============================================================================
-# 7. MAIN
+# 7. MAIN EXECUTION FLOW
 # ==============================================================================
 
-# ==============================================================================
-# 7. MAIN EXECUTION FLOW (FIXED LOGIN & SESSION SYNC)
-# ==============================================================================
-
-# Step 1: Handle Google Handshake immediately
 if st.session_state.get('connected'):
-    # Check if we haven't synced the Google info to our local session yet
     if not st.session_state.get('logged_in'):
         user_info = st.session_state.get('user_info', {})
         st.session_state.user_email = user_info.get('email')
         st.session_state.username = user_info.get('name', "Lawyer")
         st.session_state.logged_in = True
-       
-        # Register in SQLite database
         db_register_user(st.session_state.user_email, st.session_state.username)
-       
-        # FORCE RERUN: This breaks the loop and moves the script to the 'else' block
         st.rerun()
 
-# Step 2: Determine which page to show based on finalized state
 if not st.session_state.get('logged_in'):
     login_page()
 else:
-    # Sidebar navigation for logged-in users
     with st.sidebar:
         st.markdown("---")
         nav = st.radio("Navigate", ["🏢 Chambers", "📚 Library", "ℹ️ Team"], label_visibility="collapsed")
@@ -352,11 +324,37 @@ else:
         render_chambers_page()
     elif nav == "📚 Library":
         st.title("📚 Legal Library")
-        f_list = glob.glob(f"{DATA_FOLDER}/*.pdf")
-        if f_list:
-            st.table([{"Document": os.path.basename(f), "Status": "✅ Indexed"} for f in f_list])
+        # UPDATED LIBRARY TABLE LOGIC
+        pdfs = glob.glob(f"{DATA_FOLDER}/*.pdf") + glob.glob(f"{DATA_FOLDER}/*.PDF")
+        if pdfs:
+            library_data = []
+            db_exists = os.path.exists(DB_PATH)
+            for p in pdfs:
+                file_name = os.path.basename(p)
+                file_size = round(os.path.getsize(p) / 1024, 2)
+                try:
+                    reader = PdfReader(p)
+                    pages = len(reader.pages)
+                except:
+                    pages = "N/A"
+                   
+                library_data.append({
+                    "Document Name": file_name,
+                    "Pages": pages,
+                    "Size (KB)": file_size,
+                    "Status": "✅ Indexed" if db_exists else "⏳ Pending"
+                })
+            st.table(library_data)
         else:
-            st.warning("No legal documents found in DATA folder.")
+            st.warning(f"No legal documents found in '{DATA_FOLDER}' folder.")
+           
+        if st.button("🔄 Sync Library"):
+            with st.spinner("Processing documents..."):
+                db_inst, msg = sync_knowledge_base()
+                st.session_state.law_db = db_inst
+                st.success(msg)
+                st.rerun()
+
     else:
         st.title("ℹ️ Development Team")
         st.info("Advocate AI - Sindh Legal Intelligence System")
@@ -367,9 +365,5 @@ else:
         * Ibrahim Sohail
         * Huzaifa Khan
         * Daniyal Faraz
-
         """)
-
-
-
 
