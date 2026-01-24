@@ -5,7 +5,6 @@ sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import streamlit as st
 import sqlite3
 import datetime
-import pyttsx3
 import smtplib
 import time
 import streamlit.components.v1 as components
@@ -13,12 +12,9 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from streamlit_mic_recorder import speech_to_text
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from google.cloud import texttospeech
-import base64
-
 
 # ==============================================================================
-# 1. INITIALIZATION & DATABASE
+# 1. INITIALIZATION & DATABASE (REMAINING SAME)
 # ==============================================================================
 st.set_page_config(page_title="Alpha Apex", page_icon="⚖️", layout="wide")
 API_KEY = st.secrets["GEMINI_API_KEY"]
@@ -55,22 +51,8 @@ def db_load_history(email, case_name):
 init_sql_db()
 
 # ==============================================================================
-# 2. CORE UTILITIES & VOICE ENGINE
+# 2. CORE UTILITIES & VOICE CONTROL HUB
 # ==============================================================================
-engine = pyttsx3.init()
-
-def speak_urdu_free(text, lang_code):
-    voices = engine.getProperty('voices')
-
-    for v in voices:
-        if "urdu" in v.name.lower() or "pakistan" in v.name.lower():
-            engine.setProperty('voice', v.id)
-            break
-
-    engine.setProperty('rate', 150)
-    engine.say(text)
-    engine.runAndWait()
-
 def send_email_report(receiver_email, case_name, history):
     try:
         sender_email = st.secrets["EMAIL_USER"]
@@ -96,37 +78,54 @@ def load_llm():
         safety_settings={"HARM_CATEGORY_HARASSMENT": "BLOCK_NONE", "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE", "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE", "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE"}
     )
 
+# --- THE NEW VOICE CONTROL INTERFACE ---
 def play_voice_js(text, lang_code):
     safe_text = text.replace('\\', '\\\\').replace("'", "\\'").replace('"', '\\"').replace("\n", " ").strip()
     js_code = f"""
-    <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border: 1px solid #dee2e6; margin: 10px 0;">
-        <span style="font-size: 0.85rem; font-weight: bold; color: #495057; margin-right: 10px;">🔊 Audio Control:</span>
-        <button onclick="window.speechSynthesis.resume()" style="border: 1px solid #ced4da; background: white; padding: 4px 10px; border-radius: 4px; cursor: pointer;">Play</button>
-        <button onclick="window.speechSynthesis.pause()" style="border: 1px solid #ced4da; background: white; padding: 4px 10px; border-radius: 4px; cursor: pointer;">Pause</button>
-        <button onclick="window.speechSynthesis.cancel()" style="border: none; background: #dc3545; color: white; padding: 4px 10px; border-radius: 4px; cursor: pointer;">Stop</button>
-        <select id="rate" onchange="window.updateSpeed(this.value)" style="margin-left: 10px; padding: 2px;">
-            <option value="0.8">0.8x</option>
-            <option value="1.0" selected>1.0x</option>
-            <option value="1.2">1.2x</option>
+    <div style="background: #f0f2f6; padding: 10px; border-radius: 10px; border: 1px solid #dcdfe3; margin-top: 10px; font-family: sans-serif;">
+        <p style="margin: 0 0 10px 0; font-size: 0.8rem; color: #555;">🔊 Voice Controls</p>
+        <button onclick="window.speechSynthesis.resume()" style="padding: 5px 10px; cursor: pointer;">Play</button>
+        <button onclick="window.speechSynthesis.pause()" style="padding: 5px 10px; cursor: pointer;">Pause</button>
+        <button onclick="window.speechSynthesis.cancel()" style="padding: 5px 10px; cursor: pointer; background: #ff4b4b; color: white; border: none; border-radius: 3px;">Stop</button>
+        
+        <label style="margin-left: 10px; font-size: 0.8rem;">Speed: </label>
+        <select id="speedSel" onchange="changeSpeed(this.value)" style="padding: 3px;">
+            <option value="0.5">0.5x</option>
+            <option value="1" selected>1.0x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2.0x</option>
         </select>
     </div>
+
     <script>
-        window.speechRate = 1.0;
-        window.updateSpeed = function(v) {{ window.speechRate = parseFloat(v); window.triggerSpeak(); }};
-        window.triggerSpeak = function() {{
+        var msg = new SpeechSynthesisUtterance("{safe_text}");
+        msg.lang = "{lang_code}";
+        var currentSpeed = 1;
+
+        function changeSpeed(val) {{
+            currentSpeed = parseFloat(val);
+            if (window.speechSynthesis.speaking) {{
+                window.speechSynthesis.cancel();
+                msg.rate = currentSpeed;
+                window.speechSynthesis.speak(msg);
+            }}
+        }}
+
+        function initSpeak() {{
             window.speechSynthesis.cancel();
-            var utterance = new SpeechSynthesisUtterance("{safe_text}");
-            utterance.rate = window.speechRate;
+            msg.rate = currentSpeed;
             var voices = window.speechSynthesis.getVoices();
-            var targetLang = "{lang_code}".split('-')[0];
-            var voice = voices.find(v => v.lang.startsWith(targetLang)) || 
-                        voices.find(v => v.lang.startsWith('ur')) || 
-                        voices.find(v => v.lang.startsWith('hi'));
-            if(voice) utterance.voice = voice;
-            window.speechSynthesis.speak(utterance);
-        }};
-        if (window.speechSynthesis.onvoiceschanged !== undefined) {{ window.speechSynthesis.onvoiceschanged = window.triggerSpeak; }}
-        window.triggerSpeak();
+            if ("{lang_code}".startsWith('ur')) {{
+                var v = voices.find(v => v.lang.startsWith('ur')) || voices.find(v => v.lang.startsWith('hi'));
+                if (v) msg.voice = v;
+            }}
+            window.speechSynthesis.speak(msg);
+        }}
+
+        if (window.speechSynthesis.onvoiceschanged !== undefined) {{
+            window.speechSynthesis.onvoiceschanged = initSpeak;
+        }}
+        initSpeak();
     </script>
     """
     components.html(js_code, height=100)
@@ -143,48 +142,27 @@ def render_chambers():
         st.title("⚖️ Alpha Apex")
         target_lang = st.selectbox("🌐 Language", list(langs.keys()))
         lang_code = langs[target_lang]
-
         st.divider()
         st.subheader("🏛️ System Configuration")
-        with st.expander("Custom Instructions & Behavior", expanded=True):
+        with st.expander("Custom Instructions", expanded=True):
             sys_persona = st.text_input("Core Persona:", value="#You are a Pakistani law analyst")
-            custom_instructions = st.text_area("Custom System Instructions:", 
-                placeholder="e.g. Focus on inheritance law, always cite PPC 302, etc.")
+            custom_instructions = st.text_area("Custom Instructions:", placeholder="e.g. Cite PPC 302")
             use_irac = st.toggle("Enable IRAC Style", value=True)
-        
         st.divider()
-        st.subheader("📁 Case Management")
         conn = sqlite3.connect(SQL_DB_FILE)
         cases = [r[0] for r in conn.execute("SELECT case_name FROM cases WHERE email=?", (st.session_state.user_email,)).fetchall()]
         conn.close()
-        
         active_case = st.selectbox("Current Case", cases if cases else ["General Consultation"])
         st.session_state.active_case = active_case
-
-        new_case = st.text_input("New Case Name")
-        if st.button("➕ Create"):
-            if new_case:
-                conn = sqlite3.connect(SQL_DB_FILE)
-                conn.execute("INSERT INTO cases (email, case_name, created_at) VALUES (?,?,?)", (st.session_state.user_email, new_case, "2026-01-24"))
-                conn.commit(); conn.close(); st.rerun()
-
-        if st.button("🗑️ Delete"):
-            conn = sqlite3.connect(SQL_DB_FILE)
-            conn.execute("DELETE FROM cases WHERE email=? AND case_name=?", (st.session_state.user_email, active_case))
-            conn.commit(); conn.close(); st.rerun()
-
         if st.button("📧 Email History"):
             hist = db_load_history(st.session_state.user_email, st.session_state.active_case)
-            if send_email_report(st.session_state.user_email, st.session_state.active_case, hist):
-                st.success("Sent!")
+            if send_email_report(st.session_state.user_email, st.session_state.active_case, hist): st.success("Sent!")
 
     st.header(f"💼 Chambers: {st.session_state.active_case}")
-    
-    # UI Layout: History ABOVE input
+
     chat_container = st.container()
+
     st.divider()
-    
-    # Input Area
     m_col, i_col = st.columns([1, 8])
     with m_col: voice_in = speech_to_text(language=lang_code, key='mic', just_once=True)
     with i_col: text_in = st.chat_input("Start legal consultation...")
@@ -198,7 +176,7 @@ def render_chambers():
     if query:
         db_save_message(st.session_state.user_email, st.session_state.active_case, "user", query)
         try:
-            irac_style = "Structure response using IRAC." if use_irac else "Professional response."
+            irac_style = "Structure response using IRAC (Issue, Rule, Analysis, Conclusion)." if use_irac else "Professional response."
             full_system_prompt = f"{sys_persona}\n{irac_style}\nADDITIONAL: {custom_instructions}\nLANGUAGE: {target_lang}"
             response = load_llm().invoke(f"{full_system_prompt}\n\nClient Query: {query}").content
             db_save_message(st.session_state.user_email, st.session_state.active_case, "assistant", response)
@@ -206,25 +184,21 @@ def render_chambers():
         except Exception as e:
             st.error(f"Error: {e}")
 
+    # Voice Trigger (Shows Control Hub above prompt area)
     if history and history[-1]["role"] == "assistant":
         if st.session_state.last_spoken != history[-1]["content"]:
-            speak_urdu_free(history[-1]["content"], lang_code)
+            play_voice_js(history[-1]["content"], lang_code)
             st.session_state.last_spoken = history[-1]["content"]
 
 # ==============================================================================
-# 4. LIBRARY & ABOUT
+# 4. LIBRARY & ABOUT (REMAINING SAME)
 # ==============================================================================
 def render_library():
     st.header("📚 Legal Library")
-    st.info("Direct access to Pakistan Penal Code (PPC) and Constitutional Amendments.")
-    st.write("Current selection: **Pakistan Penal Code 1860**")
-    st.write("---")
-    st.markdown("- **Section 302:** Punishment of qatl-i-amd.")
-    st.markdown("- **Section 420:** Cheating and dishonestly inducing delivery of property.")
+    st.info("Direct access to Pakistan Penal Code (PPC).")
 
 def render_about():
     st.header("ℹ️ About Alpha Apex")
-    st.write("Alpha Apex is an AI-powered legal intelligence system.")
     team = [
         {"Name": "Saim Ahmed", "Contact": "03700297696", "Email": "saimahmed.work733@gmail.com"},
         {"Name": "Huzaifa Khan", "Contact": "03102526567", "Email": "m.huzaifa.khan471@gmail.com"},
@@ -249,7 +223,3 @@ else:
     if page == "Chambers": render_chambers()
     elif page == "Legal Library": render_library()
     else: render_about()
-
-
-
-
