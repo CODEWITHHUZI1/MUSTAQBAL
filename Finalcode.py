@@ -1,6 +1,6 @@
 # ==============================================================================
 # ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM
-# VERSION: 35.0 (FINAL STABILITY & CONVERSATIONAL LOGIC)
+# VERSION: 35.1 (RESTORED AUTH ARCHITECTURE & CONVERSATIONAL LOGIC)
 # ARCHITECTS: SAIM AHMED, HUZAIFA KHAN, MUSTAFA KHAN, IBRAHIM SOHAIL, DANIYAL FARAZ
 # ==============================================================================
 
@@ -30,7 +30,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 
 # ==============================================================================
-# 1. PERMANENT SOVEREIGN SHADER ARCHITECTURE (DARK NAVY / WHITE TEXT)
+# 1. PERMANENT SOVEREIGN SHADER ARCHITECTURE
 # ==============================================================================
 
 st.set_page_config(
@@ -103,6 +103,17 @@ def init_leviathan_db():
     cursor.execute('CREATE TABLE IF NOT EXISTS law_assets (id INTEGER PRIMARY KEY AUTOINCREMENT, filename TEXT, filesize_kb REAL, page_count INTEGER, sync_timestamp TEXT, asset_status TEXT DEFAULT "Verified")')
     cursor.execute('CREATE TABLE IF NOT EXISTS system_telemetry (event_id INTEGER PRIMARY KEY AUTOINCREMENT, user_email TEXT, event_type TEXT, description TEXT, event_timestamp TEXT)')
     conn.commit(); conn.close()
+
+def db_create_vault_user(email, name, password):
+    if email == "" or password == "": return False
+    conn = sqlite3.connect(SQL_DB_FILE); cursor = conn.cursor()
+    ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        cursor.execute('INSERT INTO users (email, full_name, vault_key, registration_date) VALUES (?, ?, ?, ?)', (email, name, password, ts))
+        cursor.execute('INSERT INTO chambers (owner_email, chamber_name, init_date) VALUES (?, ?, ?)', (email, "General Litigation Chamber", ts))
+        conn.commit(); conn.close(); return True
+    except sqlite3.IntegrityError:
+        conn.close(); return False
 
 def db_verify_vault_access(email, password):
     conn = sqlite3.connect(SQL_DB_FILE); cursor = conn.cursor()
@@ -186,7 +197,6 @@ def render_main_interface():
         v_input = speech_to_text(language=lexicon[lang_choice], key='v_mic', just_once=True)
         final_query = t_input or v_input
 
-        # AI LOGIC BLOCK - CORRECT INDENTATION
         if final_query:
             db_log_consultation(st.session_state.user_email, st.session_state.current_chamber, "user", final_query)
             with chat_container:
@@ -198,11 +208,10 @@ def render_main_interface():
                     try:
                         instruction = f"""
                         SYSTEM PERSONA: {custom_persona}. 
-
                         CONVERSATIONAL PROTOCOL:
-                        1. GREETINGS: Respond professionally to pleasantries (e.g., "Hi", "Hello").
-                        2. GRATITUDE: Respond politely to "Thank you" or "Thanks".
-                        3. FAREWELLS: Respond formally to "Goodbye" or "That is all".
+                        1. GREETINGS: Respond professionally to pleasantries.
+                        2. GRATITUDE: Respond politely to "Thank you".
+                        3. FAREWELLS: Respond formally to "Goodbye".
 
                         STRICT LEGAL BOUNDARY: 
                         For any other query NOT related to Constitutional Law, Civil Law, Criminal Procedure, or Legal Strategy:
@@ -211,15 +220,11 @@ def render_main_interface():
                         RESPONSE LANGUAGE: {lang_choice}.
                         USER QUERY: {final_query}
                         """
-
                         engine = get_analytical_engine()
-                        resp_obj = engine.invoke(instruction)
-                        resp = resp_obj.content
-                        
+                        resp = engine.invoke(instruction).content
                         st.markdown(resp)
                         db_log_consultation(st.session_state.user_email, st.session_state.current_chamber, "assistant", resp)
                         st.rerun()
-                        
                     except Exception as e: 
                         st.error(f"Error: {e}")
 
@@ -232,17 +237,37 @@ def render_main_interface():
         st.table([{"Architect": "Saim Ahmed", "Focus": "System Architecture"}, {"Architect": "Huzaifa Khan", "Focus": "AI Model Tuning"}, {"Architect": "Mustafa Khan", "Focus": "SQL Persistence"}, {"Architect": "Ibrahim Sohail", "Focus": "UI/UX & Shaders"}, {"Architect": "Daniyal Faraz", "Focus": "Quality Assurance"}])
 
 # ==============================================================================
-# 5. AUTHENTICATION
+# 5. SOVEREIGN PORTAL (RESTORED TABBED ARCHITECTURE)
 # ==============================================================================
 
 def render_sovereign_portal():
     apply_leviathan_shaders()
     st.title("⚖️ ALPHA APEX LEVIATHAN")
-    e = st.text_input("Vault Email Address"); k = st.text_input("Security Key", type="password")
-    if st.button("Grant Access"):
-        n = db_verify_vault_access(e, k)
-        if n: st.session_state.logged_in = True; st.session_state.user_email = e; st.rerun()
-        else: st.error("Access Denied")
+    st.markdown("#### Strategic Litigation and Legal Intelligence Framework")
+    
+    tab_login, tab_reg = st.tabs(["🔐 Secure Login", "📝 Counsel Registration"])
+    
+    with tab_login:
+        e = st.text_input("Vault Email Address", key="login_email")
+        k = st.text_input("Security Key", type="password", key="login_key")
+        if st.button("Grant Access"):
+            n = db_verify_vault_access(e, k)
+            if n: 
+                st.session_state.logged_in = True
+                st.session_state.user_email = e
+                st.rerun()
+            else: 
+                st.error("Access Denied: Invalid Credentials")
+                
+    with tab_reg:
+        re = st.text_input("Registry Email", key="reg_email")
+        rn = st.text_input("Counsel Full Name", key="reg_name")
+        rk = st.text_input("Set Security Key", type="password", key="reg_key")
+        if st.button("Initialize Account"):
+            if db_create_vault_user(re, rn, rk):
+                st.success("Counsel Account Successfully Initialized")
+            else:
+                st.error("Registration Failed: Account may already exist")
 
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 if not st.session_state.logged_in: render_sovereign_portal()
