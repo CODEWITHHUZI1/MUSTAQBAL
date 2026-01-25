@@ -1,6 +1,6 @@
 # ==============================================================================
 # ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM
-# VERSION: 35.4 (UNIFIED AUTH & BOTTOM BAR COLOR FIX)
+# VERSION: 35.5 (TABBED AUTH RESTORED & UI STABILITY)
 # ARCHITECTS: SAIM AHMED, HUZAIFA KHAN, MUSTAFA KHAN, IBRAHIM SOHAIL, DANIYAL FARAZ
 # ==============================================================================
 
@@ -245,7 +245,7 @@ def render_main_interface():
         st.table([{"Architect": "Saim Ahmed", "Focus": "System Architecture"}, {"Architect": "Huzaifa Khan", "Focus": "AI Model Tuning"}, {"Architect": "Mustafa Khan", "Focus": "SQL Persistence"}, {"Architect": "Ibrahim Sohail", "Focus": "UI/UX & Shaders"}, {"Architect": "Daniyal Faraz", "Focus": "Quality Assurance"}])
 
 # ==============================================================================
-# 5. SOVEREIGN PORTAL (UNIFIED)
+# 5. SOVEREIGN PORTAL (TABBED AUTH)
 # ==============================================================================
 
 def render_sovereign_portal():
@@ -253,26 +253,29 @@ def render_sovereign_portal():
     st.title("⚖️ ALPHA APEX LEVIATHAN")
     st.markdown("#### Strategic Litigation and Legal Intelligence Framework")
     
-    e = st.text_input("Vault Email Address")
-    n = st.text_input("Counsel Full Name (For New Registry)")
-    k = st.text_input("Security Key", type="password")
+    auth_tabs = st.tabs(["🔐 Secure Login", "📝 Counsel Registration"])
     
-    col1, col2 = st.columns(2)
-    with col1:
+    with auth_tabs[0]:
+        e_log = st.text_input("Vault Email Address", key="log_email")
+        k_log = st.text_input("Security Key", type="password", key="log_key")
         if st.button("Grant Access"):
-            user_name = db_verify_vault_access(e, k)
+            user_name = db_verify_vault_access(e_log, k_log)
             if user_name:
                 st.session_state.logged_in = True
-                st.session_state.user_email = e
+                st.session_state.user_email = e_log
                 st.rerun()
             else:
                 st.error("Access Denied")
-    with col2:
+                
+    with auth_tabs[1]:
+        e_reg = st.text_input("Registry Email", key="reg_email")
+        n_reg = st.text_input("Counsel Full Name", key="reg_name")
+        k_reg = st.text_input("Set Security Key", type="password", key="reg_key")
         if st.button("Initialize Registry"):
-            if db_create_vault_user(e, n, k):
+            if db_create_vault_user(e_reg, n_reg, k_reg):
                 st.success("Counsel Registered")
             else:
-                st.error("Registry Failed")
+                st.error("Registry Failed: User may already exist.")
 
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 if not st.session_state.logged_in: render_sovereign_portal()
