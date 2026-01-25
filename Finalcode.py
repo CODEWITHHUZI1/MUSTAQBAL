@@ -1,6 +1,6 @@
 # ==============================================================================
 # ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM
-# VERSION: 36.2 (IRAC PROTOCOL & UI STABILITY)
+# VERSION: 36.3 (PAKISTAN/SINDH JURISDICTION FIX)
 # ARCHITECTS: SAIM AHMED, HUZAIFA KHAN, MUSTAFA KHAN, IBRAHIM SOHAIL, DANIYAL FARAZ
 # ==============================================================================
 
@@ -250,17 +250,24 @@ def render_main_interface():
                     try:
                         active_persona = "Honorable High Court Justice" if judge_mode else custom_persona
                         
-                        # NORMAL MODE INSTRUCTION: IRAC + CITATIONS
+                        # JURISDICTION FIX: EXPLICITLY REJECT NON-PAKISTANI LAW
+                        jurisdiction_logic = """
+                        JURISDICTIONAL BOUNDARY: You are operating strictly under the Law of PAKISTAN and the Province of SINDH. 
+                        NEVER cite Indian Statutes (e.g., Indian Penal Code). 
+                        ALWAYS cite Pakistani Statutes (e.g., Pakistan Penal Code, Sindh Land Revenue Act, Registration Act 1908).
+                        """
+
                         if not judge_mode:
-                            format_instruction = """
+                            format_instruction = f"""
+                            {jurisdiction_logic}
                             MANDATORY RESPONSE FORMAT: Use IRAC (Issue, Rule, Application, Conclusion).
                             1. ISSUE: State the legal question clearly.
-                            2. RULE: Cite specific Sections, Acts, and Statutes (e.g., Transfer of Property Act 1882, Registration Act 1908).
+                            2. RULE: Cite specific Sections, Acts, and Statutes of PAKISTAN/SINDH.
                             3. APPLICATION: Apply the rules to the specific facts provided.
                             4. CONCLUSION: Provide a definitive legal summary.
                             """
                         else:
-                            format_instruction = "JUDGE MODE: Evaluate the lawyer's argument critically, demanding proof and highlighting procedural errors."
+                            format_instruction = f"{jurisdiction_logic} JUDGE MODE: Evaluate the lawyer's argument critically from the bench of a Pakistani High Court."
 
                         instruction = f"""
                         SYSTEM PERSONA: {active_persona}. 
@@ -308,7 +315,7 @@ def render_main_interface():
             st.subheader("Leviathan Telemetry")
             st.info("System operational. AI Analytical Engines: Online.")
         with admin_tab4:
-            st.table([{"Architect": "Saim Ahmed", "Focus": "System Architecture"}, {"Architect": "Huzaifa Khan", "Focus": "AI Model Tuning"}, {"Architect": "Mustafa Khan", "Focus": "SQL Persistence"}, {"Architect": "Ibrahim Sohail", "Focus": "UI/UX & Shaders"}, {"Architect": "Daniyal Faraz", "Focus": "Quality Assurance"}])
+            st.table([{"Architect": "Saim Ahmed", "Focus": "Prompt Engineer"}, {"Architect": "Huzaifa Khan", "Focus": "Backend Developer"}, {"Architect": "Mustafa Khan", "Focus": "Main Coder"}, {"Architect": "Ibrahim Sohail", "Focus": "Presentation Lead"}, {"Architect": "Daniyal Faraz", "Focus": "Debugger and Modifier"}])
 
 # ==============================================================================
 # 5. SOVEREIGN PORTAL (TABBED AUTH)
