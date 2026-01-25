@@ -1,6 +1,6 @@
 # ==============================================================================
 # ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM
-# VERSION: 35.9 (INTEGRATED MIC & UI STABILITY)
+# VERSION: 36.0 (LAW LIBRARY SYNC & UI STABILITY)
 # ARCHITECTS: SAIM AHMED, HUZAIFA KHAN, MUSTAFA KHAN, IBRAHIM SOHAIL, DANIYAL FARAZ
 # ==============================================================================
 
@@ -142,7 +142,7 @@ def db_log_consultation(email, chamber_name, role, content):
 def db_fetch_chamber_history(email, chamber_name):
     conn = sqlite3.connect(SQL_DB_FILE); cursor = conn.cursor()
     cursor.execute("SELECT m.sender_role, m.message_body FROM message_logs m JOIN chambers c ON m.chamber_id = c.id WHERE c.owner_email=? AND c.chamber_name=? ORDER BY m.id ASC", (email, chamber_name))
-    rows = cursor.fetchall(); conn.close(); return [{"role": r, "content": b} for r, b in rows]
+    rows = rows = cursor.fetchall(); conn.close(); return [{"role": r, "content": b} for r, b in rows]
 
 init_leviathan_db()
 
@@ -152,7 +152,7 @@ init_leviathan_db()
 
 @st.cache_resource
 def get_analytical_engine():
-    return ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"], temperature=0.2)
+    return ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"], temperature=0.2)
 
 # ==============================================================================
 # 4. MAIN INTERFACE
@@ -227,12 +227,11 @@ def render_main_interface():
             for msg in history:
                 with st.chat_message(msg["role"]): st.write(msg["content"])
 
-        # PROMPT BAR INTEGRATION
         prompt_col, mic_col = st.columns([0.9, 0.1])
         with prompt_col:
             t_input = st.chat_input("Enter Legal Query...")
         with mic_col:
-            st.write(" ") # Alignment
+            st.write(" ") 
             v_input = speech_to_text(language=lexicon[lang_choice], key='v_mic', just_once=True, start_prompt="🎙️", stop_prompt="⏹️")
         
         final_query = t_input or v_input
@@ -252,11 +251,6 @@ def render_main_interface():
                         1. GREETINGS: Respond professionally to pleasantries.
                         2. GRATITUDE: Respond politely to "Thank you".
                         3. FAREWELLS: Respond formally to "Goodbye".
-
-                        STRICT LEGAL BOUNDARY: 
-                        For any other query NOT related to Constitutional Law, Civil Law, Criminal Procedure, or Legal Strategy:
-                        Strictly state: 'I am authorized only for legal consultation.'
-
                         RESPONSE LANGUAGE: {lang_choice}.
                         USER QUERY: {final_query}
                         """
@@ -270,7 +264,17 @@ def render_main_interface():
 
     elif nav_mode == "Law Library":
         st.header("📚 Law Library Vault")
-        st.info("Module Synchronized with Local Data Folder.")
+        st.markdown("### Synchronized Legal Assets")
+        
+        conn = sqlite3.connect(SQL_DB_FILE)
+        df_assets = pd.read_sql_query("SELECT filename AS 'File Name', filesize_kb AS 'Size (KB)', sync_timestamp AS 'Sync Date', asset_status AS 'Status' FROM law_assets", conn)
+        conn.close()
+        
+        if df_assets.empty:
+            st.info("No synchronized PDFs found in local vault.")
+        else:
+            st.dataframe(df_assets, use_container_width=True, hide_index=True)
+            st.success(f"Verified {len(df_assets)} high-priority legal documents.")
 
     elif nav_mode == "System Admin":
         st.header("🛡️ System Administration Console")
@@ -296,13 +300,7 @@ def render_main_interface():
             st.info("System operational. AI Analytical Engines: Online.")
 
         with admin_tab4:
-            st.table([
-                {"Architect": "Saim Ahmed", "Focus": "System Architecture"},
-                {"Architect": "Huzaifa Khan", "Focus": "AI Model Tuning"},
-                {"Architect": "Mustafa Khan", "Focus": "SQL Persistence"},
-                {"Architect": "Ibrahim Sohail", "Focus": "UI/UX & Shaders"},
-                {"Architect": "Daniyal Faraz", "Focus": "Quality Assurance"}
-            ])
+            st.table([{"Architect": "Saim Ahmed", "Focus": "System Architecture"}, {"Architect": "Huzaifa Khan", "Focus": "AI Model Tuning"}, {"Architect": "Mustafa Khan", "Focus": "SQL Persistence"}, {"Architect": "Ibrahim Sohail", "Focus": "UI/UX & Shaders"}, {"Architect": "Daniyal Faraz", "Focus": "Quality Assurance"}])
 
 # ==============================================================================
 # 5. SOVEREIGN PORTAL (TABBED AUTH)
