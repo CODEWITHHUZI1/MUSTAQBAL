@@ -191,8 +191,8 @@ def render_main_interface():
             with chat_container:
                 with st.chat_message("user"): st.write(final_query)
             
-            with st.chat_message("assistant"):
-                with st.spinner("Processing..."):
+ with st.chat_message("assistant"):
+             with st.spinner("Processing..."):
                     # REFINED CONVERSATIONAL LOGIC
                    # ... (Find this part in your code) ...
 with st.chat_message("assistant"):
