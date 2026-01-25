@@ -1,3 +1,9 @@
+# ==============================================================================
+# ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM
+# VERSION: 24.0 (MOBILE OPTIMIZED - SOVEREIGN PRODUCTION)
+# ARCHITECTS: SAIM AHMED, HUZAIFA KHAN, MUSTAFA KHAN, IBRAHIM SOHAIL, DANIYAL FARAZ
+# ==============================================================================
+
 __import__('pysqlite3')
 import sys
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
@@ -8,198 +14,214 @@ import datetime
 import smtplib
 import json
 import os
+import time
+import base64
+import re
 import pandas as pd
 from PyPDF2 import PdfReader
 import streamlit.components.v1 as components
 from langchain_google_genai import ChatGoogleGenerativeAI
 from streamlit_mic_recorder import speech_to_text
-from streamlit_google_auth import Authenticate
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
 
 # ==============================================================================
-# 1. GLOBAL CONFIGURATION & UI STYLING
+# 1. THEME ENGINE & MOBILE SHADER ARCHITECTURE (FIXED)
 # ==============================================================================
 st.set_page_config(
-    page_title="Alpha Apex - Enterprise Law AI", 
+    page_title="Alpha Apex - Leviathan Law AI", 
     page_icon="⚖️", 
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed" # Better for mobile first-load
 )
 
-def apply_custom_theme(theme_choice):
-    themes = {
-        "Crystal (Light)": {"bg": "#FFFFFF", "sidebar": "#F8F9FA", "text": "#1E1E1E", "accent": "#007BFF"},
-        "Slate (Muted)": {"bg": "#E2E8F0", "sidebar": "#CBD5E1", "text": "#334155", "accent": "#6366F1"},
-        "Obsidian (Dark)": {"bg": "#1A202C", "sidebar": "#2D3748", "text": "#F7FAFC", "accent": "#6366F1"},
-        "Midnight (Deep Dark)": {"bg": "#0F172A", "sidebar": "#020617", "text": "#F8FAFC", "accent": "#38BDF8"}
-    }
-    t = themes[theme_choice]
-    theme_css = f"""
+def apply_leviathan_shaders(theme_mode):
+    """
+    Injects CSS optimized for mobile viewports.
+    """
+    shader_css = """
     <style>
-        .stApp {{ background-color: {t['bg']}; color: {t['text']}; }}
-        [data-testid="stSidebar"] {{ background-color: {t['sidebar']}; padding-top: 0rem !important; }}
-        h1, h2, h3, h4, h5, h6, p, label, .stMarkdown {{ color: {t['text']} !important; }}
-        .stButton>button {{ background-color: {t['accent']}; color: white !important; border-radius: 8px; width: 100%; }}
-        .block-container {{ padding-top: 2rem; max-width: 1100px; margin: auto; }}
+        /* Mobile Viewport Fix */
+        @media (max-width: 640px) {
+            .stChatMessage { padding: 1rem !important; margin-bottom: 1rem !important; }
+            .stHeader { font-size: 1.5rem !important; }
+            [data-testid="stSidebar"] { width: 80vw !important; }
+        }
+
+        * { transition: background-color 0.5s ease; }
+        
+        [data-testid="stSidebar"] {
+            backdrop-filter: blur(15px);
+            background: rgba(15, 23, 42, 0.95) !important;
+        }
+
+        .stChatMessage {
+            border-radius: 15px !important;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important;
+            border-left: 5px solid #38bdf8 !important;
+        }
+        
+        .stButton>button {
+            width: 100% !important;
+            border-radius: 12px !important;
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%) !important;
+            color: #38bdf8 !important;
+            border: 1px solid #38bdf8 !important;
+        }
+
+        .sidebar-briefing {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            color: #f1f5f9;
+        }
     </style>
     """
-    st.markdown(theme_css, unsafe_allow_html=True)
-
-if "current_theme" not in st.session_state:
-    st.session_state.current_theme = "Obsidian (Dark)"
-apply_custom_theme(st.session_state.current_theme)
-
-API_KEY = st.secrets["GOOGLE_API_KEY"]
-SQL_DB_FILE = "alpha_apex_production_v11.db"
-
-# ==============================================================================
-# 2. VIDEO RECORDER COMPONENT
-# ==============================================================================
-def video_recorder_component():
-    st.markdown("### 📹 Consultation Recorder")
-    video_html = """
-    <div style="display: flex; flex-direction: column; align-items: center; background: #2D3748; padding: 20px; border-radius: 15px; color: white;">
-        <video id="v" width="640" height="360" autoplay muted style="border-radius: 10px; background: #000; margin-bottom: 15px;"></video>
-        <div style="display: flex; gap: 10px;">
-            <button id="start" onclick="start()" style="padding: 10px 20px; background: #48BB78; border: none; color: white; border-radius: 5px; cursor: pointer;">⏺ Record</button>
-            <button id="pause" onclick="pause()" disabled style="padding: 10px 20px; background: #ECC94B; border: none; color: white; border-radius: 5px; cursor: pointer;">⏸ Pause</button>
-            <button id="resume" onclick="resume()" disabled style="padding: 10px 20px; background: #4299E1; border: none; color: white; border-radius: 5px; cursor: pointer;">▶ Resume</button>
-            <button id="stop" onclick="stop()" disabled style="padding: 10px 20px; background: #F56565; border: none; color: white; border-radius: 5px; cursor: pointer;">⏹ Stop</button>
-        </div>
-        <p id="msg" style="margin-top: 10px; font-weight: bold; color: #CBD5E0;">Status: Ready</p>
-    </div>
-    <script>
-        let rec, stream, chunks = [];
-        const msg = document.getElementById('msg');
-        const v = document.getElementById('v');
-        
-        async function start() {
-            stream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
-            v.srcObject = stream;
-            rec = new MediaRecorder(stream);
-            rec.ondataavailable = e => chunks.push(e.data);
-            rec.onstop = () => {
-                const blob = new Blob(chunks, {type: 'video/webm'});
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url; a.download = 'consultation_record.webm'; a.click();
-            };
-            rec.start();
-            msg.innerText = "Status: 🔴 Recording";
-            btn(false, true, false, true);
-        }
-        function pause() { rec.pause(); msg.innerText = "Status: ⏸ Paused"; btn(false, false, true, true); }
-        function resume() { rec.resume(); msg.innerText = "Status: 🔴 Recording"; btn(false, true, false, true); }
-        function stop() { rec.stop(); stream.getTracks().forEach(t => t.stop()); msg.innerText = "Status: ✅ Saved"; btn(true, false, false, false); }
-        function btn(s, p, r, st) {
-            document.getElementById('start').disabled = !s;
-            document.getElementById('pause').disabled = !p;
-            document.getElementById('resume').disabled = !r;
-            document.getElementById('stop').disabled = !st;
-        }
-    </script>
-    """
-    components.html(video_html, height=500)
-
-# ==============================================================================
-# 3. DATABASE & SERVICES
-# ==============================================================================
-def db_load_history(email, case_name):
-    conn = sqlite3.connect(SQL_DB_FILE)
-    c = conn.cursor()
-    c.execute('''SELECT history.role, history.content FROM history JOIN cases ON history.case_id = cases.id WHERE cases.email=? AND cases.case_name=? ORDER BY history.id ASC''', (email, case_name))
-    results = c.fetchall()
-    conn.close()
-    return [{"role": r, "content": t} for r, t in results]
-
-def send_email_report(receiver, case_name, history):
-    try:
-        sender_email = st.secrets["EMAIL_USER"]
-        sender_password = st.secrets["EMAIL_PASS"].replace(" ", "")
-        report = f"ALPHA APEX LEGAL REPORT\nCase: {case_name}\n\n"
-        for m in history:
-            report += f"{m['role'].upper()}: {m['content']}\n\n"
-        msg = MIMEMultipart()
-        msg['From'] = sender_email
-        msg['To'] = receiver
-        msg['Subject'] = f"Legal Record: {case_name}"
-        msg.attach(MIMEText(report, 'plain'))
-        s = smtplib.SMTP('smtp.gmail.com', 587)
-        s.starttls()
-        s.login(sender_email, sender_password)
-        s.send_message(msg)
-        s.quit()
-        return True
-    except Exception as e:
-        st.error(f"Email Error: {e}")
-        return False
-
-# ==============================================================================
-# 4. INTERFACE RENDERING
-# ==============================================================================
-def render_about():
-    st.header("ℹ️ About Alpha Apex")
-    st.info("Version: 2.1.0 | Engine: Google Gemini 1.5")
-    team_data = [
-        {"Name": "Saim Ahmed", "Designation": "Lead Full Stack Developer", "Email": "saimahmed@example.com"}, 
-        {"Name": "Huzaifa Khan", "Designation": "AI System Architect", "Email": "m.huzaifa.khan471@gmail.com"},
-        {"Name": "Ibrahim Sohail", "Designation": "Presentation Lead", "Email": "ibrahimsohailkhan10@gmail.com"},
-        {"Name": "Daniyal Faraz", "Designation": "Debugger", "Email": "daniyalfarazkhan2012@gmail.com"},
-        {"Name": "Muhammad Mustafa Khan", "Designation": "Prompt Engineer", "Email": "muhammadmustafakhan430@gmail.com"}
-    ]
-    st.table(team_data)
-
-def render_chambers():
-    st.header(f"💼 Case Chamber: {st.session_state.active_case}")
-    
-    if st.button("📧 Email Transcript", use_container_width=True):
-        hist = db_load_history(st.session_state.user_email, st.session_state.active_case)
-        if send_email_report(st.session_state.user_email, st.session_state.active_case, hist):
-            st.toast("Report Sent Successfully!", icon="✅")
-
-    video_recorder_component()
-    st.divider()
-    
-    current_history = db_load_history(st.session_state.user_email, st.session_state.active_case)
-    for msg in current_history:
-        with st.chat_message(msg["role"]):
-            st.write(msg["content"])
-
-# ==============================================================================
-# 5. MASTER EXECUTION ENGINE
-# ==============================================================================
-if "connected" not in st.session_state:
-    st.session_state.connected = False
-if "user_email" not in st.session_state:
-    st.session_state.user_email = ""
-if "active_case" not in st.session_state:
-    st.session_state.active_case = "General Consultation"
-
-# --- SIDEBAR LOGIC ---
-if st.session_state.connected:
-    with st.sidebar:
-        st.title("⚖️ Alpha Apex")
-        st.subheader("🎨 Appearance")
-        theme_options = ["Crystal (Light)", "Slate (Muted)", "Obsidian (Dark)", "Midnight (Deep Dark)"]
-        selected_theme = st.selectbox("Select Shade", theme_options, index=theme_options.index(st.session_state.current_theme))
-        if selected_theme != st.session_state.current_theme:
-            st.session_state.current_theme = selected_theme
-            st.rerun()
-            
-        st.divider()
-        navigation_selection = st.radio("Navigation", ["Consultation Chambers", "Digital Library", "About Alpha Apex"])
-        
-    if navigation_selection == "Consultation Chambers":
-        render_chambers()
-    elif navigation_selection == "About Alpha Apex":
-        render_about()
+    if theme_mode == "Dark Mode":
+        shader_css += "<style>.stApp { background: #020617 !important; color: #ffffff !important; } .stChatMessage div, .stChatMessage p { color: #ffffff !important; }</style>"
     else:
-        st.header("📚 Digital Library")
-else:
-    # This acts as a placeholder for your Authenticator login logic
-    st.title("⚖️ Alpha Apex Secure Entrance")
-    if st.button("Demo Login"):
-        st.session_state.connected = True
-        st.session_state.user_email = "mustafa@example.com"
-        st.rerun()
+        shader_css += "<style>.stApp { background: #f8fafc !important; color: #0f172a !important; }</style>"
+    st.markdown(shader_css, unsafe_allow_html=True)
+
+# ==============================================================================
+# 2. DATABASE PERSISTENCE (CHECK_SAME_THREAD FIX FOR MOBILE)
+# ==============================================================================
+
+SQL_DB_FILE = "alpha_apex_leviathan_master_v24.db"
+
+def get_db_connection():
+    # check_same_thread=False is critical for mobile server requests
+    return sqlite3.connect(SQL_DB_FILE, check_same_thread=False)
+
+def init_leviathan_db():
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS users (email TEXT PRIMARY KEY, full_name TEXT, vault_key TEXT, registration_date TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS chambers (id INTEGER PRIMARY KEY AUTOINCREMENT, owner_email TEXT, chamber_name TEXT, init_date TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS message_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, chamber_id INTEGER, sender_role TEXT, message_body TEXT, ts_created TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS law_assets (id INTEGER PRIMARY KEY AUTOINCREMENT, filename TEXT, filesize_kb REAL, page_count INTEGER, sync_timestamp TEXT)''')
+    conn.commit(); conn.close()
+
+def db_create_vault_user(email, name, password):
+    if not email or not password: return False
+    conn = get_db_connection(); c = conn.cursor()
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        c.execute("INSERT INTO users (email, full_name, vault_key, registration_date) VALUES (?,?,?,?)", (email, name, password, now))
+        c.execute("INSERT INTO chambers (owner_email, chamber_name, init_date) VALUES (?,?,?)", (email, "Default High Court Chamber", now))
+        conn.commit(); conn.close(); return True
+    except: conn.close(); return False
+
+def db_verify_vault_access(email, password):
+    conn = get_db_connection(); c = conn.cursor()
+    c.execute("SELECT full_name FROM users WHERE email=? AND vault_key=?", (email, password))
+    res = c.fetchone(); conn.close(); return res[0] if res else None
+
+def db_log_consultation(email, chamber_name, role, content):
+    conn = get_db_connection(); c = conn.cursor()
+    c.execute("SELECT id FROM chambers WHERE owner_email=? AND chamber_name=?", (email, chamber_name))
+    cid = c.fetchone()
+    if cid:
+        ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        c.execute("INSERT INTO message_logs (chamber_id, sender_role, message_body, ts_created) VALUES (?,?,?,?)", (cid[0], role, content, ts))
+        conn.commit()
+    conn.close()
+
+def db_fetch_chamber_history(email, chamber_name):
+    conn = get_db_connection(); c = conn.cursor()
+    q = 'SELECT m.sender_role, m.message_body FROM message_logs m JOIN chambers c ON m.chamber_id = c.id WHERE c.owner_email=? AND c.chamber_name=? ORDER BY m.id ASC'
+    c.execute(q, (email, chamber_name))
+    rows = [{"role": r, "content": b} for r, b in c.fetchall()]
+    conn.close(); return rows
+
+init_leviathan_db()
+
+# ==============================================================================
+# 3. CORE ANALYTICAL SERVICES
+# ==============================================================================
+
+@st.cache_resource
+def get_analytical_engine():
+    return ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=st.secrets["GOOGLE_API_KEY"], temperature=0.2)
+
+def execute_neural_synthesis(text, language_code):
+    clean = re.sub(r'[*#_]', '', text).replace("'", "").replace('"', "").replace("\n", " ").strip()
+    js = f"<script>window.speechSynthesis.cancel(); var m = new SpeechSynthesisUtterance('{clean}'); m.lang = '{language_code}'; window.speechSynthesis.speak(m);</script>"
+    components.html(js, height=0)
+
+def dispatch_legal_brief_smtp(target, chamber, history):
+    try:
+        user, pwd = st.secrets["EMAIL_USER"], st.secrets["EMAIL_PASS"].replace(" ", "")
+        content = f"LEGAL BRIEF: {chamber}\n\n"
+        for e in history: content += f"[{e['role'].upper()}]: {e['content']}\n\n"
+        msg = MIMEMultipart(); msg['From'] = user; msg['To'] = target; msg['Subject'] = f"Brief: {chamber}"
+        msg.attach(MIMEText(content, 'plain', 'utf-8'))
+        s = smtplib.SMTP('smtp.gmail.com', 587); s.starttls(); s.login(user, pwd); s.send_message(msg); s.quit(); return True
+    except: return False
+
+# ==============================================================================
+# 4. UI: CHAMBERS
+# ==============================================================================
+
+def render_chamber_workstation():
+    lex = {"English": "en-US", "Urdu": "ur-PK", "Sindhi": "sd-PK", "Punjabi": "pa-PK"}
+    with st.sidebar:
+        st.title("⚖️ ALPHA APEX")
+        mode = st.radio("Theme", ["Dark Mode", "Light Mode"], horizontal=True)
+        apply_leviathan_shaders(mode)
+        lang = st.selectbox("Language", list(lex.keys()))
+        u_mail = st.session_state.user_email
+        conn = get_db_connection(); c = conn.cursor()
+        ch_list = [r[0] for r in c.execute("SELECT chamber_name FROM chambers WHERE owner_email=?", (u_mail,)).fetchall()]
+        conn.close()
+        st.session_state.current_chamber = st.selectbox("Chamber", ch_list if ch_list else ["Default"])
+        st.markdown('<div class="sidebar-briefing"><b>🤖 PERSONA:</b> Senior Advocate<br><b>METHOD:</b> IRAC</div>', unsafe_allow_html=True)
+        if st.button("📧 Send Email"):
+            if dispatch_legal_brief_smtp(u_mail, st.session_state.current_chamber, db_fetch_chamber_history(u_mail, st.session_state.current_chamber)):
+                st.sidebar.success("Sent")
+        if st.button("🚪 Logout"):
+            st.session_state.clear(); st.rerun()
+
+    st.header(f"💼 {st.session_state.current_chamber}")
+    for e in db_fetch_chamber_history(st.session_state.user_email, st.session_state.current_chamber):
+        with st.chat_message(e["role"]): st.write(e["content"])
+
+    t_in = st.chat_input("Enter Query...")
+    v_in = speech_to_text(language=lex[lang], key='mic', just_once=True)
+    f_in = t_in or v_in
+
+    if f_in and (st.session_state.get("last_query") != f_in):
+        st.session_state.last_query = f_in
+        db_log_consultation(st.session_state.user_email, st.session_state.current_chamber, "user", f_in)
+        with st.chat_message("user"): st.write(f_in)
+        with st.chat_message("assistant"):
+            with st.spinner("Wait..."):
+                p = f"Persona: Senior Advocate Pakistan. Rule: IRAC. Lang: {lang}. Query: {f_in}"
+                ans = get_analytical_engine().invoke(p).content
+                st.markdown(ans)
+                db_log_consultation(st.session_state.user_email, st.session_state.current_chamber, "assistant", ans)
+                execute_neural_synthesis(ans, lex[lang])
+                st.rerun()
+
+# ==============================================================================
+# 5. UI: PORTAL
+# ==============================================================================
+
+def render_sovereign_portal():
+    st.title("⚖️ LEVIATHAN PORTAL")
+    t1, t2 = st.tabs(["🔐 Login", "📝 Register"])
+    with t1:
+        e = st.text_input("Email"); k = st.text_input("Key", type="password")
+        if st.button("Access Vault"):
+            n = db_verify_vault_access(e, k)
+            if n: st.session_state.update({"logged_in": True, "user_email": e, "username": n}); st.rerun()
+    with t2:
+        ne = st.text_input("New Email"); nu = st.text_input("Name"); nk = st.text_input("New Key", type="password")
+        if st.button("Register"):
+            if db_create_vault_user(ne, nu, nk): st.success("Done.")
+
+if "logged_in" not in st.session_state: st.session_state.logged_in = False
+if not st.session_state.logged_in: render_sovereign_portal()
+else: render_chamber_workstation()
