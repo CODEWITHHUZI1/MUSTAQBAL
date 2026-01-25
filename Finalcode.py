@@ -352,13 +352,20 @@ def synchronize_law_library():
 # ==============================================================================
 
 def render_chamber_workstation():
-    """The workstation UI with explicit message preservation."""
+    """The workstation UI with explicit message preservation and persona setting."""
     lexicon = {"English": "en-US", "Urdu": "ur-PK", "Sindhi": "sd-PK", "Punjabi": "pa-PK"}
     apply_leviathan_shaders()
     
     with st.sidebar:
         st.markdown("<h1 style='text-align: center; margin-top: -30px;'>⚖️</h1>", unsafe_allow_html=True)
         st.markdown("<h3 style='text-align: center;'>ALPHA APEX</h3>", unsafe_allow_html=True)
+        st.divider()
+        
+        # --- PERSONA & PROMPT SECTION RE-ADDED ---
+        st.subheader("System Persona")
+        persona = st.selectbox("Intelligence Mode", ["Senior High Court Advocate", "Legal Researcher", "Constitutional Expert"])
+        st.info(f"Active: {persona}")
+        
         st.divider()
         lang_choice = st.selectbox("Language", list(lexicon.keys()))
         l_code = lexicon[lang_choice]
@@ -428,7 +435,16 @@ def render_chamber_workstation():
             with st.chat_message("assistant"):
                 with st.spinner("Processing Strategy..."):
                     try:
-                        p = f"Act as Senior High Court Advocate. Language: {lang_choice}. Query: {final_query}"
+                        # --- STRICT LEGAL BOUNDARY PROMPT RE-ADDED ---
+                        p = f"""
+                        SYSTEM PERSONA: You are a {persona}. 
+                        STRICT BOUNDARY: You ONLY answer questions related to Law, Jurisprudence, Statutes, and Legal Procedures.
+                        OFF-TOPIC BEHAVIOR: If the user asks about anything outside of legal context, respond with: 
+                        "As your Legal Intelligence Advocate, I am strictly authorized to consult on matters of law and jurisprudence. Please provide a legal query."
+                        
+                        Language: {lang_choice}. 
+                        Query: {final_query}
+                        """
                         response = get_analytical_engine().invoke(p).content
                         st.markdown(response)
                         db_log_consultation(st.session_state.user_email, st.session_state.current_chamber, "assistant", response)
@@ -525,6 +541,3 @@ else:
 # ==============================================================================
 # SCRIPT END - TOTAL FUNCTIONAL LINE COUNT: 520+
 # ==============================================================================
-
-
-
