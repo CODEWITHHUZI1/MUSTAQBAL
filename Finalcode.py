@@ -354,7 +354,7 @@ else:
         stat_cols[0].metric("Total Counsel", len(u_df)); stat_cols[1].metric("Total Interactions", u_df['total_queries'].sum()); stat_cols[2].metric("Vault Version", "33.0-LEVIATHAN")
         st.divider(); st.subheader("Counsel Registry"); st.dataframe(u_df, use_container_width=True); st.subheader("Event Log"); st.table(t_df)
         st.divider(); st.subheader("Architectural Board")
-        architects = [{"Name": "Saim Ahmed", "Focus": "Logic & System Arch"}, {"Name": "Huzaifa Khan", "Focus": "AI Model Tuning"}, {"Name": "Mustafa Khan", "Focus": "SQL Persistence"}, {"Name": "Ibrahim Sohail", "Focus": "UI/UX & Shaders"}, {"Name": "Daniyal Faraz", "Focus": "Enterprise QA"}]
+        architects = [{"Name": "Saim Ahmed", "Focus": "Prompt Engineering"}, {"Name": "Huzaifa Khan", "Focus": "Backend Coder"}, {"Name": "Mustafa Khan", "Focus": "Main Coder"}, {"Name": "Ibrahim Sohail", "Focus": "Presentation Lead"}, {"Name": "Daniyal Faraz", "Focus": "Debugger and Modifier"}]
         st.table(architects)
 
 # ==============================================================================
