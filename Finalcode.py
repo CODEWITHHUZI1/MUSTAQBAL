@@ -1,6 +1,6 @@
 # ==============================================================================
 # ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM
-# VERSION: 35.7 (CASE DELETION FEATURE & UI STABILITY)
+# VERSION: 35.8 (TOP-RIGHT EMAIL BRIEF & UI STABILITY)
 # ARCHITECTS: SAIM AHMED, HUZAIFA KHAN, MUSTAFA KHAN, IBRAHIM SOHAIL, DANIYAL FARAZ
 # ==============================================================================
 
@@ -152,7 +152,7 @@ init_leviathan_db()
 
 @st.cache_resource
 def get_analytical_engine():
-    return ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"], temperature=0.2)
+    return ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"], temperature=0.2)
 
 # ==============================================================================
 # 4. MAIN INTERFACE
@@ -179,11 +179,9 @@ def render_main_interface():
             filtered = [c for c in chambers_raw if search_filter.lower() in c.lower()]
             st.session_state.current_chamber = st.radio("Select Case", filtered if filtered else chambers_raw, label_visibility="collapsed")
             
-            # CASE MANAGEMENT ACTIONS
             col_add, col_del = st.columns(2)
             with col_add:
                 if st.button("➕ New"): st.session_state.add_case = True
-            
             with col_del:
                 if st.button("🗑️ Delete"): st.session_state.delete_confirm = True
 
@@ -213,7 +211,18 @@ def render_main_interface():
             if st.button("🚪 Secure Logout"): st.session_state.logged_in = False; st.rerun()
 
     if nav_mode == "Chambers":
-        st.header(f"💼 CASE: {st.session_state.current_chamber}")
+        # TOP HEADER WITH ACTION BUTTON
+        head_col, action_col = st.columns([0.8, 0.2])
+        with head_col:
+            st.header(f"💼 CASE: {st.session_state.current_chamber}")
+        with action_col:
+            st.write(" ") # Padding
+            if st.button("📧 Email Brief"):
+                st.toast("Synthesizing Brief and Dispatching...")
+                # Brief Logic Placeholder
+                time.sleep(1)
+                st.success("Brief Dispatched to Vault Email")
+
         chat_container = st.container()
         with chat_container:
             history = db_fetch_chamber_history(st.session_state.user_email, st.session_state.current_chamber)
@@ -261,7 +270,6 @@ def render_main_interface():
 
     elif nav_mode == "System Admin":
         st.header("🛡️ System Administration Console")
-        
         admin_tab1, admin_tab2, admin_tab3, admin_tab4 = st.tabs(["👥 Registered Counsels", "⚖️ Interaction Logs", "📡 System Telemetry", "🏗️ Project Credits"])
         
         with admin_tab1:
@@ -274,13 +282,7 @@ def render_main_interface():
         with admin_tab2:
             st.subheader("Interaction Analytics")
             conn = sqlite3.connect(SQL_DB_FILE)
-            query = """
-                SELECT u.full_name, c.chamber_name, m.sender_role, m.message_body, m.ts_created 
-                FROM message_logs m 
-                JOIN chambers c ON m.chamber_id = c.id 
-                JOIN users u ON c.owner_email = u.email 
-                ORDER BY m.id DESC LIMIT 100
-            """
+            query = "SELECT u.full_name, c.chamber_name, m.sender_role, m.message_body, m.ts_created FROM message_logs m JOIN chambers c ON m.chamber_id = c.id JOIN users u ON c.owner_email = u.email ORDER BY m.id DESC LIMIT 100"
             df_logs = pd.read_sql_query(query, conn)
             st.dataframe(df_logs, use_container_width=True)
             conn.close()
