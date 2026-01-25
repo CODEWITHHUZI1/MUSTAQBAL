@@ -3,7 +3,6 @@
 # VERSION: 32.0 (SIDEBAR ACCESSIBILITY FIX - MAXIMUM PROCEDURAL DENSITY)
 # ARCHITECTS: SAIM AHMED, HUZAIFA KHAN, MUSTAFA KHAN, IBRAHIM SOHAIL, DANIYAL FARAZ
 # ==============================================================================
-s
 try:
     import pysqlite3
     import sys
