@@ -1,6 +1,6 @@
 # ==============================================================================
 # ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM
-# VERSION: 36.1 (JUDGE MODE INTEGRATED & UI STABILITY)
+# VERSION: 36.2 (IRAC PROTOCOL & UI STABILITY)
 # ARCHITECTS: SAIM AHMED, HUZAIFA KHAN, MUSTAFA KHAN, IBRAHIM SOHAIL, DANIYAL FARAZ
 # ==============================================================================
 
@@ -211,13 +211,12 @@ def render_main_interface():
             if st.button("🚪 Secure Logout"): st.session_state.logged_in = False; st.rerun()
 
     if nav_mode == "Chambers":
-        # TOP HEADER WITH JUDGE MODE AND EMAIL BRIEF
         head_col, judge_col, action_col = st.columns([0.6, 0.2, 0.2])
         with head_col:
             st.header(f"💼 CASE: {st.session_state.current_chamber}")
         with judge_col:
             st.write(" ") 
-            judge_mode = st.toggle("⚖️ JUDGE mode", help="Enable to receive critical adjudicatory feedback for training.")
+            judge_mode = st.toggle("⚖️ JUDGE mode", help="Enable for critical feedback. Disable for IRAC-formatted legal counsel.")
         with action_col:
             st.write(" ") 
             if st.button("📧 Email Brief"):
@@ -249,14 +248,25 @@ def render_main_interface():
             with st.chat_message("assistant"):
                 with st.spinner("Analyzing Statutes and Precedents..."):
                     try:
-                        active_persona = "Honorable High Court Justice (Adjudicatory Training Mode)" if judge_mode else custom_persona
+                        active_persona = "Honorable High Court Justice" if judge_mode else custom_persona
+                        
+                        # NORMAL MODE INSTRUCTION: IRAC + CITATIONS
+                        if not judge_mode:
+                            format_instruction = """
+                            MANDATORY RESPONSE FORMAT: Use IRAC (Issue, Rule, Application, Conclusion).
+                            1. ISSUE: State the legal question clearly.
+                            2. RULE: Cite specific Sections, Acts, and Statutes (e.g., Transfer of Property Act 1882, Registration Act 1908).
+                            3. APPLICATION: Apply the rules to the specific facts provided.
+                            4. CONCLUSION: Provide a definitive legal summary.
+                            """
+                        else:
+                            format_instruction = "JUDGE MODE: Evaluate the lawyer's argument critically, demanding proof and highlighting procedural errors."
+
                         instruction = f"""
                         SYSTEM PERSONA: {active_persona}. 
                         CONVERSATIONAL PROTOCOL:
-                        1. GREETINGS: Respond professionally to pleasantries.
-                        2. GRATITUDE: Respond politely to "Thank you".
-                        3. FAREWELLS: Respond formally to "Goodbye".
-                        4. JUDGE MODE LOGIC: If persona is Justice, analyze the user's input as if they are a lawyer presenting a case. Focus on weaknesses in evidence, legal loopholes, and procedural requirements.
+                        1. GREETINGS/FAREWELLS: Respond professionally.
+                        2. {format_instruction}
                         
                         RESPONSE LANGUAGE: {lang_choice}.
                         USER QUERY: {final_query}
