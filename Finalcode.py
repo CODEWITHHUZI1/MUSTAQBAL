@@ -298,7 +298,7 @@ init_leviathan_db()
 def get_analytical_engine():
     """Initializes Gemini with strictly tuned legal parameters."""
     return ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash", 
+        model="gemini-1.5-flash", 
         google_api_key=st.secrets["GOOGLE_API_KEY"], 
         temperature=0.15,
         max_output_tokens=4000
@@ -427,7 +427,16 @@ def render_chamber_workstation():
             with st.chat_message("assistant"):
                 with st.spinner("Processing Strategy..."):
                     try:
-                        p = f"Act as Senior High Court Advocate. Language: {lang_choice}. Query: {final_query}"
+                        # MODIFIED SYSTEM PROMPT ONLY
+                        p = f"""
+                        SYSTEM PERSONA: You are a Senior High Court Advocate. 
+                        STRICT BOUNDARY: You ONLY answer questions related to Law, Jurisprudence, Statutes, and Legal Procedures.
+                        OFF-TOPIC BEHAVIOR: If the user asks about anything outside of legal context (e.g., cooking, sports, general chitchat, coding, science), 
+                        you must respond with: "As your Legal Intelligence Advocate, I am strictly authorized to consult on matters of law and jurisprudence. Please provide a legal query."
+                        
+                        Language: {lang_choice}. 
+                        Query: {final_query}
+                        """
                         response = get_analytical_engine().invoke(p).content
                         st.markdown(response)
                         # 4. Save AI message to DB
