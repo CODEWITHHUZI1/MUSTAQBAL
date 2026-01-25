@@ -298,7 +298,7 @@ init_leviathan_db()
 def get_analytical_engine():
     """Initializes Gemini with strictly tuned legal parameters."""
     return ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash", 
+        model="gemini-2.5-flash", 
         google_api_key=st.secrets["GOOGLE_API_KEY"], 
         temperature=0.15,
         max_output_tokens=4000
