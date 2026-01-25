@@ -1,6 +1,6 @@
 # ==============================================================================
 # ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM
-# VERSION: 35.6 (ADMIN CONSOLE RESTORED & UI STABILITY)
+# VERSION: 35.7 (CASE DELETION FEATURE & UI STABILITY)
 # ARCHITECTS: SAIM AHMED, HUZAIFA KHAN, MUSTAFA KHAN, IBRAHIM SOHAIL, DANIYAL FARAZ
 # ==============================================================================
 
@@ -179,13 +179,32 @@ def render_main_interface():
             filtered = [c for c in chambers_raw if search_filter.lower() in c.lower()]
             st.session_state.current_chamber = st.radio("Select Case", filtered if filtered else chambers_raw, label_visibility="collapsed")
             
-            if st.button("➕ New"): st.session_state.add_case = True
+            # CASE MANAGEMENT ACTIONS
+            col_add, col_del = st.columns(2)
+            with col_add:
+                if st.button("➕ New"): st.session_state.add_case = True
+            
+            with col_del:
+                if st.button("🗑️ Delete"): st.session_state.delete_confirm = True
+
             if st.session_state.get('add_case'):
                 new_name = st.text_input("New Chamber Name")
                 if st.button("Initialize"):
                     conn = sqlite3.connect(SQL_DB_FILE); cursor = conn.cursor()
                     cursor.execute("INSERT INTO chambers (owner_email, chamber_name, init_date) VALUES (?,?,?)", (u_mail, new_name, str(datetime.date.today())))
                     conn.commit(); conn.close(); st.session_state.add_case = False; st.rerun()
+            
+            if st.session_state.get('delete_confirm'):
+                st.warning(f"Purge '{st.session_state.current_chamber}'?")
+                if st.button("Confirm Deletion"):
+                    conn = sqlite3.connect(SQL_DB_FILE); cursor = conn.cursor()
+                    cursor.execute("UPDATE chambers SET is_archived=1 WHERE owner_email=? AND chamber_name=?", (u_mail, st.session_state.current_chamber))
+                    conn.commit(); conn.close()
+                    st.session_state.delete_confirm = False
+                    st.rerun()
+                if st.button("Cancel"):
+                    st.session_state.delete_confirm = False
+                    st.rerun()
 
         st.write("---")
         with st.expander("⚙️ Settings & help"):
@@ -243,7 +262,6 @@ def render_main_interface():
     elif nav_mode == "System Admin":
         st.header("🛡️ System Administration Console")
         
-        # Restoration of Admin Tabs
         admin_tab1, admin_tab2, admin_tab3, admin_tab4 = st.tabs(["👥 Registered Counsels", "⚖️ Interaction Logs", "📡 System Telemetry", "🏗️ Project Credits"])
         
         with admin_tab1:
