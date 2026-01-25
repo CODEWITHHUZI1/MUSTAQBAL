@@ -1,6 +1,6 @@
 # ==============================================================================
 # ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM
-# VERSION: 35.1 (RESTORED AUTH ARCHITECTURE & CONVERSATIONAL LOGIC)
+# VERSION: 35.4 (UNIFIED AUTH & BOTTOM BAR COLOR FIX)
 # ARCHITECTS: SAIM AHMED, HUZAIFA KHAN, MUSTAFA KHAN, IBRAHIM SOHAIL, DANIYAL FARAZ
 # ==============================================================================
 
@@ -76,8 +76,16 @@ def apply_leviathan_shaders():
             color: #ffffff !important;
             border: 1px solid #334155 !important;
         }
+        
+        /* BLACK BOTTOM BAR FIX */
+        [data-testid="stBottomBlockContainer"] {
+            background-color: #0b1120 !important;
+            border-top: 1px solid #1e293b !important;
+        }
+
         .stChatInput textarea {
             color: #ffffff !important;
+            background-color: #1e293b !important;
         }
 
         footer {visibility: hidden;}
@@ -105,7 +113,7 @@ def init_leviathan_db():
     conn.commit(); conn.close()
 
 def db_create_vault_user(email, name, password):
-    if email == "" or password == "": return False
+    if not email or not password: return False
     conn = sqlite3.connect(SQL_DB_FILE); cursor = conn.cursor()
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     try:
@@ -144,7 +152,7 @@ init_leviathan_db()
 
 @st.cache_resource
 def get_analytical_engine():
-    return ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"], temperature=0.2)
+    return ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"], temperature=0.2)
 
 # ==============================================================================
 # 4. MAIN INTERFACE
@@ -237,7 +245,7 @@ def render_main_interface():
         st.table([{"Architect": "Saim Ahmed", "Focus": "System Architecture"}, {"Architect": "Huzaifa Khan", "Focus": "AI Model Tuning"}, {"Architect": "Mustafa Khan", "Focus": "SQL Persistence"}, {"Architect": "Ibrahim Sohail", "Focus": "UI/UX & Shaders"}, {"Architect": "Daniyal Faraz", "Focus": "Quality Assurance"}])
 
 # ==============================================================================
-# 5. SOVEREIGN PORTAL (RESTORED TABBED ARCHITECTURE)
+# 5. SOVEREIGN PORTAL (UNIFIED)
 # ==============================================================================
 
 def render_sovereign_portal():
@@ -245,29 +253,26 @@ def render_sovereign_portal():
     st.title("⚖️ ALPHA APEX LEVIATHAN")
     st.markdown("#### Strategic Litigation and Legal Intelligence Framework")
     
-    tab_login, tab_reg = st.tabs(["🔐 Secure Login", "📝 Counsel Registration"])
+    e = st.text_input("Vault Email Address")
+    n = st.text_input("Counsel Full Name (For New Registry)")
+    k = st.text_input("Security Key", type="password")
     
-    with tab_login:
-        e = st.text_input("Vault Email Address", key="login_email")
-        k = st.text_input("Security Key", type="password", key="login_key")
+    col1, col2 = st.columns(2)
+    with col1:
         if st.button("Grant Access"):
-            n = db_verify_vault_access(e, k)
-            if n: 
+            user_name = db_verify_vault_access(e, k)
+            if user_name:
                 st.session_state.logged_in = True
                 st.session_state.user_email = e
                 st.rerun()
-            else: 
-                st.error("Access Denied: Invalid Credentials")
-                
-    with tab_reg:
-        re = st.text_input("Registry Email", key="reg_email")
-        rn = st.text_input("Counsel Full Name", key="reg_name")
-        rk = st.text_input("Set Security Key", type="password", key="reg_key")
-        if st.button("Initialize Account"):
-            if db_create_vault_user(re, rn, rk):
-                st.success("Counsel Account Successfully Initialized")
             else:
-                st.error("Registration Failed: Account may already exist")
+                st.error("Access Denied")
+    with col2:
+        if st.button("Initialize Registry"):
+            if db_create_vault_user(e, n, k):
+                st.success("Counsel Registered")
+            else:
+                st.error("Registry Failed")
 
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 if not st.session_state.logged_in: render_sovereign_portal()
