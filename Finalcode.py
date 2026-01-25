@@ -194,19 +194,32 @@ def render_main_interface():
             with st.chat_message("assistant"):
                 with st.spinner("Processing..."):
                     # REFINED CONVERSATIONAL LOGIC
-                    instruction = f"""
-                    SYSTEM PERSONA: {custom_persona}.
-                    
-                    CONVERSATIONAL PROTOCOL:
-                    1. If the user greets you (e.g., Hello, Hi, Greetings), respond formally and professionally.
-                    2. If the user says thank you, respond with a professional "You are most welcome, Counsel" or similar.
-                    3. If the user says goodbye or farewell, respond formally.
-                    4. For any other query NOT related to Constitutional Law, Civil Law, Criminal Procedure, or Legal Strategy: 
-                       Strictly state: 'I am authorized only for legal consultation.'
-                    
-                    RESPONSE LANGUAGE: {lang_choice}.
-                    USER QUERY: {final_query}
-                    """
+                   # ... (Find this part in your code) ...
+with st.chat_message("assistant"):
+    with st.spinner("Analyzing Statutes and Precedents..."):
+        try:
+            # --- REPLACE ONLY THE BLOCK BELOW ---
+            instruction = f"""
+            SYSTEM PERSONA: {custom_persona}. 
+
+            CONVERSATIONAL PROTOCOL:
+            1. GREETINGS: If the user greets you (e.g., "Hi", "Hello"), respond with a professional, legal-themed greeting.
+            2. GRATITUDE: If the user says "Thank you", respond politely as a Senior Counsel.
+            3. FAREWELLS: If the user says "Goodbye" or "That is all", respond with a formal professional farewell.
+
+            STRICT LEGAL BOUNDARY: 
+            For any other query NOT related to Constitutional Law, Civil Law, Criminal Procedure, or Legal Strategy:
+            Strictly state: 'I am authorized only for legal consultation.'
+
+            RESPONSE LANGUAGE: {lang_choice}.
+            USER QUERY: {final_query}
+            """
+            # --- END OF REPLACEMENT ---
+
+            # AI Inference Call
+            engine = get_analytical_engine()
+            response_obj = engine.invoke(instruction)
+        
                     try:
                         resp = get_analytical_engine().invoke(instruction).content
                         st.markdown(resp)
