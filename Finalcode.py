@@ -1,6 +1,6 @@
 # ==============================================================================
 # ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM
-# VERSION: 36.0 (LAW LIBRARY SYNC & UI STABILITY)
+# VERSION: 36.1 (JUDGE MODE INTEGRATED & UI STABILITY)
 # ARCHITECTS: SAIM AHMED, HUZAIFA KHAN, MUSTAFA KHAN, IBRAHIM SOHAIL, DANIYAL FARAZ
 # ==============================================================================
 
@@ -142,7 +142,7 @@ def db_log_consultation(email, chamber_name, role, content):
 def db_fetch_chamber_history(email, chamber_name):
     conn = sqlite3.connect(SQL_DB_FILE); cursor = conn.cursor()
     cursor.execute("SELECT m.sender_role, m.message_body FROM message_logs m JOIN chambers c ON m.chamber_id = c.id WHERE c.owner_email=? AND c.chamber_name=? ORDER BY m.id ASC", (email, chamber_name))
-    rows = rows = cursor.fetchall(); conn.close(); return [{"role": r, "content": b} for r, b in rows]
+    rows = cursor.fetchall(); conn.close(); return [{"role": r, "content": b} for r, b in rows]
 
 init_leviathan_db()
 
@@ -152,7 +152,7 @@ init_leviathan_db()
 
 @st.cache_resource
 def get_analytical_engine():
-    return ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"], temperature=0.2)
+    return ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"], temperature=0.2)
 
 # ==============================================================================
 # 4. MAIN INTERFACE
@@ -211,9 +211,13 @@ def render_main_interface():
             if st.button("🚪 Secure Logout"): st.session_state.logged_in = False; st.rerun()
 
     if nav_mode == "Chambers":
-        head_col, action_col = st.columns([0.8, 0.2])
+        # TOP HEADER WITH JUDGE MODE AND EMAIL BRIEF
+        head_col, judge_col, action_col = st.columns([0.6, 0.2, 0.2])
         with head_col:
             st.header(f"💼 CASE: {st.session_state.current_chamber}")
+        with judge_col:
+            st.write(" ") 
+            judge_mode = st.toggle("⚖️ JUDGE mode", help="Enable to receive critical adjudicatory feedback for training.")
         with action_col:
             st.write(" ") 
             if st.button("📧 Email Brief"):
@@ -245,12 +249,15 @@ def render_main_interface():
             with st.chat_message("assistant"):
                 with st.spinner("Analyzing Statutes and Precedents..."):
                     try:
+                        active_persona = "Honorable High Court Justice (Adjudicatory Training Mode)" if judge_mode else custom_persona
                         instruction = f"""
-                        SYSTEM PERSONA: {custom_persona}. 
+                        SYSTEM PERSONA: {active_persona}. 
                         CONVERSATIONAL PROTOCOL:
                         1. GREETINGS: Respond professionally to pleasantries.
                         2. GRATITUDE: Respond politely to "Thank you".
                         3. FAREWELLS: Respond formally to "Goodbye".
+                        4. JUDGE MODE LOGIC: If persona is Justice, analyze the user's input as if they are a lawyer presenting a case. Focus on weaknesses in evidence, legal loopholes, and procedural requirements.
+                        
                         RESPONSE LANGUAGE: {lang_choice}.
                         USER QUERY: {final_query}
                         """
@@ -265,28 +272,21 @@ def render_main_interface():
     elif nav_mode == "Law Library":
         st.header("📚 Law Library Vault")
         st.markdown("### Synchronized Legal Assets")
-        
         conn = sqlite3.connect(SQL_DB_FILE)
         df_assets = pd.read_sql_query("SELECT filename AS 'File Name', filesize_kb AS 'Size (KB)', sync_timestamp AS 'Sync Date', asset_status AS 'Status' FROM law_assets", conn)
         conn.close()
-        
-        if df_assets.empty:
-            st.info("No synchronized PDFs found in local vault.")
-        else:
-            st.dataframe(df_assets, use_container_width=True, hide_index=True)
-            st.success(f"Verified {len(df_assets)} high-priority legal documents.")
+        if df_assets.empty: st.info("No synchronized PDFs found in local vault.")
+        else: st.dataframe(df_assets, use_container_width=True, hide_index=True)
 
     elif nav_mode == "System Admin":
         st.header("🛡️ System Administration Console")
         admin_tab1, admin_tab2, admin_tab3, admin_tab4 = st.tabs(["👥 Registered Counsels", "⚖️ Interaction Logs", "📡 System Telemetry", "🏗️ Project Credits"])
-        
         with admin_tab1:
             st.subheader("Counsel Directory")
             conn = sqlite3.connect(SQL_DB_FILE)
             df_users = pd.read_sql_query("SELECT full_name, email, membership_tier, total_queries, registration_date FROM users", conn)
             st.dataframe(df_users, use_container_width=True)
             conn.close()
-
         with admin_tab2:
             st.subheader("Interaction Analytics")
             conn = sqlite3.connect(SQL_DB_FILE)
@@ -294,13 +294,11 @@ def render_main_interface():
             df_logs = pd.read_sql_query(query, conn)
             st.dataframe(df_logs, use_container_width=True)
             conn.close()
-
         with admin_tab3:
             st.subheader("Leviathan Telemetry")
             st.info("System operational. AI Analytical Engines: Online.")
-
         with admin_tab4:
-            st.table([{"Architect": "Saim Ahmed", "Focus": "Prompt Engineer"}, {"Architect": "Huzaifa Khan", "Focus": "Backend Developer"}, {"Architect": "Mustafa Khan", "Focus": "Main Coder"}, {"Architect": "Ibrahim Sohail", "Focus": "Presentation Lead"}, {"Architect": "Daniyal Faraz", "Focus": "Debgger and Modifier"}])
+            st.table([{"Architect": "Saim Ahmed", "Focus": "System Architecture"}, {"Architect": "Huzaifa Khan", "Focus": "AI Model Tuning"}, {"Architect": "Mustafa Khan", "Focus": "SQL Persistence"}, {"Architect": "Ibrahim Sohail", "Focus": "UI/UX & Shaders"}, {"Architect": "Daniyal Faraz", "Focus": "Quality Assurance"}])
 
 # ==============================================================================
 # 5. SOVEREIGN PORTAL (TABBED AUTH)
@@ -310,9 +308,7 @@ def render_sovereign_portal():
     apply_leviathan_shaders()
     st.title("⚖️ ALPHA APEX LEVIATHAN")
     st.markdown("#### Strategic Litigation and Legal Intelligence Framework")
-    
     auth_tabs = st.tabs(["🔐 Secure Login", "📝 Counsel Registration"])
-    
     with auth_tabs[0]:
         e_log = st.text_input("Vault Email Address", key="log_email")
         k_log = st.text_input("Security Key", type="password", key="log_key")
@@ -322,18 +318,14 @@ def render_sovereign_portal():
                 st.session_state.logged_in = True
                 st.session_state.user_email = e_log
                 st.rerun()
-            else:
-                st.error("Access Denied")
-                
+            else: st.error("Access Denied")
     with auth_tabs[1]:
         e_reg = st.text_input("Registry Email", key="reg_email")
         n_reg = st.text_input("Counsel Full Name", key="reg_name")
         k_reg = st.text_input("Set Security Key", type="password", key="reg_key")
         if st.button("Initialize Registry"):
-            if db_create_vault_user(e_reg, n_reg, k_reg):
-                st.success("Counsel Registered")
-            else:
-                st.error("Registry Failed: User may already exist.")
+            if db_create_vault_user(e_reg, n_reg, k_reg): st.success("Counsel Registered")
+            else: st.error("Registry Failed: User may already exist.")
 
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 if not st.session_state.logged_in: render_sovereign_portal()
