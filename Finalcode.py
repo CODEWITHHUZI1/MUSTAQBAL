@@ -1,6 +1,6 @@
 # ==============================================================================
 # ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM
-# VERSION: 35.5 (TABBED AUTH RESTORED & UI STABILITY)
+# VERSION: 35.6 (ADMIN CONSOLE RESTORED & UI STABILITY)
 # ARCHITECTS: SAIM AHMED, HUZAIFA KHAN, MUSTAFA KHAN, IBRAHIM SOHAIL, DANIYAL FARAZ
 # ==============================================================================
 
@@ -242,7 +242,43 @@ def render_main_interface():
 
     elif nav_mode == "System Admin":
         st.header("🛡️ System Administration Console")
-        st.table([{"Architect": "Saim Ahmed", "Focus": "System Architecture"}, {"Architect": "Huzaifa Khan", "Focus": "AI Model Tuning"}, {"Architect": "Mustafa Khan", "Focus": "SQL Persistence"}, {"Architect": "Ibrahim Sohail", "Focus": "UI/UX & Shaders"}, {"Architect": "Daniyal Faraz", "Focus": "Quality Assurance"}])
+        
+        # Restoration of Admin Tabs
+        admin_tab1, admin_tab2, admin_tab3, admin_tab4 = st.tabs(["👥 Registered Counsels", "⚖️ Interaction Logs", "📡 System Telemetry", "🏗️ Project Credits"])
+        
+        with admin_tab1:
+            st.subheader("Counsel Directory")
+            conn = sqlite3.connect(SQL_DB_FILE)
+            df_users = pd.read_sql_query("SELECT full_name, email, membership_tier, total_queries, registration_date FROM users", conn)
+            st.dataframe(df_users, use_container_width=True)
+            conn.close()
+
+        with admin_tab2:
+            st.subheader("Interaction Analytics")
+            conn = sqlite3.connect(SQL_DB_FILE)
+            query = """
+                SELECT u.full_name, c.chamber_name, m.sender_role, m.message_body, m.ts_created 
+                FROM message_logs m 
+                JOIN chambers c ON m.chamber_id = c.id 
+                JOIN users u ON c.owner_email = u.email 
+                ORDER BY m.id DESC LIMIT 100
+            """
+            df_logs = pd.read_sql_query(query, conn)
+            st.dataframe(df_logs, use_container_width=True)
+            conn.close()
+
+        with admin_tab3:
+            st.subheader("Leviathan Telemetry")
+            st.info("System operational. AI Analytical Engines: Online.")
+
+        with admin_tab4:
+            st.table([
+                {"Architect": "Saim Ahmed", "Focus": "System Architecture"},
+                {"Architect": "Huzaifa Khan", "Focus": "AI Model Tuning"},
+                {"Architect": "Mustafa Khan", "Focus": "SQL Persistence"},
+                {"Architect": "Ibrahim Sohail", "Focus": "UI/UX & Shaders"},
+                {"Architect": "Daniyal Faraz", "Focus": "Quality Assurance"}
+            ])
 
 # ==============================================================================
 # 5. SOVEREIGN PORTAL (TABBED AUTH)
