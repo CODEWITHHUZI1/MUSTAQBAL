@@ -1,6 +1,6 @@
 # ==============================================================================
 # ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM
-# VERSION: 35.8 (TOP-RIGHT EMAIL BRIEF & UI STABILITY)
+# VERSION: 35.9 (INTEGRATED MIC & UI STABILITY)
 # ARCHITECTS: SAIM AHMED, HUZAIFA KHAN, MUSTAFA KHAN, IBRAHIM SOHAIL, DANIYAL FARAZ
 # ==============================================================================
 
@@ -211,15 +211,13 @@ def render_main_interface():
             if st.button("🚪 Secure Logout"): st.session_state.logged_in = False; st.rerun()
 
     if nav_mode == "Chambers":
-        # TOP HEADER WITH ACTION BUTTON
         head_col, action_col = st.columns([0.8, 0.2])
         with head_col:
             st.header(f"💼 CASE: {st.session_state.current_chamber}")
         with action_col:
-            st.write(" ") # Padding
+            st.write(" ") 
             if st.button("📧 Email Brief"):
                 st.toast("Synthesizing Brief and Dispatching...")
-                # Brief Logic Placeholder
                 time.sleep(1)
                 st.success("Brief Dispatched to Vault Email")
 
@@ -229,8 +227,14 @@ def render_main_interface():
             for msg in history:
                 with st.chat_message(msg["role"]): st.write(msg["content"])
 
-        t_input = st.chat_input("Enter Legal Query...")
-        v_input = speech_to_text(language=lexicon[lang_choice], key='v_mic', just_once=True)
+        # PROMPT BAR INTEGRATION
+        prompt_col, mic_col = st.columns([0.9, 0.1])
+        with prompt_col:
+            t_input = st.chat_input("Enter Legal Query...")
+        with mic_col:
+            st.write(" ") # Alignment
+            v_input = speech_to_text(language=lexicon[lang_choice], key='v_mic', just_once=True, start_prompt="🎙️", stop_prompt="⏹️")
+        
         final_query = t_input or v_input
 
         if final_query:
