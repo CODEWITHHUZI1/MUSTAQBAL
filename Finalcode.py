@@ -43,7 +43,7 @@ st.set_page_config(
 def apply_leviathan_shaders():
     """
     Injects a permanent Dark Mode CSS architecture.
-    Expanded with explicit viewport and container constraints.
+    Updated with high-visibility sidebar toggle persistence.
     """
     shader_css = """
     <style>
@@ -61,6 +61,17 @@ def apply_leviathan_shaders():
             background-color: rgba(15, 23, 42, 0.98) !important;
             border-right: 2px solid #38bdf8 !important;
             box-shadow: 10px 0 20px rgba(0,0,0,0.5) !important;
+        }
+
+        /* Sidebar Reopen Button Persistence (High Visibility) */
+        button[kind="headerNoPadding"] {
+            background-color: #38bdf8 !important;
+            color: #020617 !important;
+            border-radius: 50% !important;
+            padding: 5px !important;
+            box-shadow: 0 0 15px #38bdf8 !important;
+            left: 10px !important;
+            top: 10px !important;
         }
 
         /* High-Fidelity Chat Geometry */
@@ -298,7 +309,7 @@ init_leviathan_db()
 def get_analytical_engine():
     """Initializes Gemini with strictly tuned legal parameters."""
     return ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash", 
+        model="gemini-1.5-flash", 
         google_api_key=st.secrets["GOOGLE_API_KEY"], 
         temperature=0.15,
         max_output_tokens=4000
@@ -392,7 +403,6 @@ def render_chamber_workstation():
     st.header(f"💼 CASE: {st.session_state.current_chamber}")
     st.write("---")
     
-    # CRITICAL: Always pull from DB to prevent disappearing messages
     chat_container = st.container()
     with chat_container:
         history = db_fetch_chamber_history(st.session_state.user_email, st.session_state.current_chamber)
@@ -411,37 +421,27 @@ def render_chamber_workstation():
     final_query = t_input or v_input
 
     if final_query:
-        # Prevent double-processing
         if "last_processed" not in st.session_state or st.session_state.last_processed != final_query:
             st.session_state.last_processed = final_query
-            
-            # 1. Log User Message Immediately
             db_log_consultation(st.session_state.user_email, st.session_state.current_chamber, "user", final_query)
-            
-            # 2. Display immediately for UX
             with chat_container:
                 with st.chat_message("user"):
                     st.write(final_query)
-            
-            # 3. Generate AI Response
             with st.chat_message("assistant"):
                 with st.spinner("Processing Strategy..."):
                     try:
-                        # MODIFIED SYSTEM PROMPT ONLY
                         p = f"""
                         SYSTEM PERSONA: You are a Senior High Court Advocate. 
                         STRICT BOUNDARY: You ONLY answer questions related to Law, Jurisprudence, Statutes, and Legal Procedures.
-                        OFF-TOPIC BEHAVIOR: If the user asks about anything outside of legal context (e.g., cooking, sports, general chitchat, coding, science), 
-                        you must respond with: "As your Legal Intelligence Advocate, I am strictly authorized to consult on matters of law and jurisprudence. Please provide a legal query."
+                        OFF-TOPIC BEHAVIOR: If the user asks about anything outside of legal context, respond with: 
+                        "As your Legal Intelligence Advocate, I am strictly authorized to consult on matters of law and jurisprudence. Please provide a legal query."
                         
                         Language: {lang_choice}. 
                         Query: {final_query}
                         """
                         response = get_analytical_engine().invoke(p).content
                         st.markdown(response)
-                        # 4. Save AI message to DB
                         db_log_consultation(st.session_state.user_email, st.session_state.current_chamber, "assistant", response)
-                        # 5. Rerun to reset state and ensure SQL persistence is rendered next turn
                         st.rerun()
                     except Exception as e:
                         st.error(f"AI Error: {e}")
