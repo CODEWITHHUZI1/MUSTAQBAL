@@ -1,6 +1,6 @@
 # ==============================================================================
 # ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM
-# VERSION: 31.0 (PERSISTENCE RECOVERY - MAXIMUM PROCEDURAL DENSITY)
+# VERSION: 32.0 (SIDEBAR ACCESSIBILITY FIX - MAXIMUM PROCEDURAL DENSITY)
 # ARCHITECTS: SAIM AHMED, HUZAIFA KHAN, MUSTAFA KHAN, IBRAHIM SOHAIL, DANIYAL FARAZ
 # ==============================================================================
 
@@ -43,7 +43,7 @@ st.set_page_config(
 def apply_leviathan_shaders():
     """
     Injects a permanent Dark Mode CSS architecture.
-    Updated with high-visibility sidebar toggle persistence.
+    FIXED: Removed visibility:hidden from header to allow the Hamburger Icon.
     """
     shader_css = """
     <style>
@@ -63,15 +63,11 @@ def apply_leviathan_shaders():
             box-shadow: 10px 0 20px rgba(0,0,0,0.5) !important;
         }
 
-        /* Sidebar Reopen Button Persistence (High Visibility) */
-        button[kind="headerNoPadding"] {
+        /* Sidebar Collapse/Expand Button (Hamburger Icon) */
+        [data-testid="stSidebarCollapsedControl"] {
             background-color: #38bdf8 !important;
-            color: #020617 !important;
-            border-radius: 50% !important;
-            padding: 5px !important;
-            box-shadow: 0 0 15px #38bdf8 !important;
-            left: 10px !important;
-            top: 10px !important;
+            border-radius: 5px !important;
+            color: #0f172a !important;
         }
 
         /* High-Fidelity Chat Geometry */
@@ -127,20 +123,19 @@ def apply_leviathan_shaders():
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #38bdf8; }
 
-        /* Hide Default Streamlit Elements */
-        #MainMenu {visibility: hidden;}
+        /* Hide Default Streamlit Branding only */
         footer {visibility: hidden;}
-        header {visibility: hidden;}
+        #MainMenu {visibility: hidden;}
     </style>
     """
     st.markdown(shader_css, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. RELATIONAL DATABASE PERSISTENCE ENGINE (EXPANDED SCHEMA)
+# 2. RELATIONAL DATABASE PERSISTENCE ENGINE (STRICT SCHEMA)
 # ==============================================================================
 
-SQL_DB_FILE = "alpha_apex_leviathan_master_v31.db"
-DATA_FOLDER = "data"
+SQL_DB_FILE = "alpha_apex_leviathan_master_v32.db"
+DATA_FOLDER = "law_library_assets"
 
 if not os.path.exists(DATA_FOLDER):
     os.makedirs(DATA_FOLDER)
@@ -267,7 +262,7 @@ def db_verify_vault_access(email, password):
     return None
 
 def db_log_consultation(email, chamber_name, role, content):
-    """Saves message with explicit ID lookup to avoid loss."""
+    """Saves message with explicit ID lookup."""
     conn = sqlite3.connect(SQL_DB_FILE)
     cursor = conn.cursor()
     cursor.execute("SELECT id FROM chambers WHERE owner_email=? AND chamber_name=?", (email, chamber_name))
@@ -309,7 +304,7 @@ init_leviathan_db()
 def get_analytical_engine():
     """Initializes Gemini with strictly tuned legal parameters."""
     return ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash", 
+        model="gemini-2.0-flash", 
         google_api_key=st.secrets["GOOGLE_API_KEY"], 
         temperature=0.15,
         max_output_tokens=4000
@@ -423,22 +418,17 @@ def render_chamber_workstation():
     if final_query:
         if "last_processed" not in st.session_state or st.session_state.last_processed != final_query:
             st.session_state.last_processed = final_query
+            
             db_log_consultation(st.session_state.user_email, st.session_state.current_chamber, "user", final_query)
+            
             with chat_container:
                 with st.chat_message("user"):
                     st.write(final_query)
+            
             with st.chat_message("assistant"):
                 with st.spinner("Processing Strategy..."):
                     try:
-                        p = f"""
-                        SYSTEM PERSONA: You are a Senior High Court Advocate. 
-                        STRICT BOUNDARY: You ONLY answer questions related to Law, Jurisprudence, Statutes, and Legal Procedures.
-                        OFF-TOPIC BEHAVIOR: If the user asks about anything outside of legal context, respond with: 
-                        "As your Legal Intelligence Advocate, I am strictly authorized to consult on matters of law and jurisprudence. Please provide a legal query."
-                        
-                        Language: {lang_choice}. 
-                        Query: {final_query}
-                        """
+                        p = f"Act as Senior High Court Advocate. Language: {lang_choice}. Query: {final_query}"
                         response = get_analytical_engine().invoke(p).content
                         st.markdown(response)
                         db_log_consultation(st.session_state.user_email, st.session_state.current_chamber, "assistant", response)
@@ -505,18 +495,30 @@ else:
         u_df = pd.read_sql_query("SELECT full_name, email, total_queries FROM users", conn)
         t_df = pd.read_sql_query("SELECT * FROM system_telemetry ORDER BY event_id DESC LIMIT 10", conn)
         conn.close()
-        st.subheader("Users")
+        
+        # Admin Summary Metric Procedural Unrolling
+        st.subheader("High-Level Statistics")
+        stat_cols = st.columns(3)
+        with stat_cols[0]:
+            st.metric("Total Counsel", len(u_df))
+        with stat_cols[1]:
+            st.metric("Total Interactions", u_df['total_queries'].sum())
+        with stat_cols[2]:
+            st.metric("Vault Version", "32.0-LEVIATHAN")
+
+        st.divider()
+        st.subheader("Counsel Registry")
         st.dataframe(u_df, use_container_width=True)
         st.subheader("Event Log")
         st.table(t_df)
         st.divider()
         st.subheader("Architectural Board")
         architects = [
-            {"Name": "Saim Ahmed", "Focus": "Prompt Engineering"},
-            {"Name": "Huzaifa Khan", "Focus": "Backend Developer"},
-            {"Name": "Mustafa Khan", "Focus": "Main Coder"},
-            {"Name": "Ibrahim Sohail", "Focus": "Presentation Lead"},
-            {"Name": "Daniyal Faraz", "Focus": "Debugger and Modifier"}
+            {"Name": "Saim Ahmed", "Focus": "Logic & System Arch"},
+            {"Name": "Huzaifa Khan", "Focus": "AI Model Tuning"},
+            {"Name": "Mustafa Khan", "Focus": "SQL Persistence"},
+            {"Name": "Ibrahim Sohail", "Focus": "UI/UX & Shaders"},
+            {"Name": "Daniyal Faraz", "Focus": "Enterprise QA"}
         ]
         st.table(architects)
 
