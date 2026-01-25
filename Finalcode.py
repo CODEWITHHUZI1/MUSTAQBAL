@@ -300,7 +300,7 @@ def render_main_interface():
             st.info("System operational. AI Analytical Engines: Online.")
 
         with admin_tab4:
-            st.table([{"Architect": "Saim Ahmed", "Focus": "System Architecture"}, {"Architect": "Huzaifa Khan", "Focus": "AI Model Tuning"}, {"Architect": "Mustafa Khan", "Focus": "SQL Persistence"}, {"Architect": "Ibrahim Sohail", "Focus": "UI/UX & Shaders"}, {"Architect": "Daniyal Faraz", "Focus": "Quality Assurance"}])
+            st.table([{"Architect": "Saim Ahmed", "Focus": "Prompt Engineer"}, {"Architect": "Huzaifa Khan", "Focus": "Backend Developer"}, {"Architect": "Mustafa Khan", "Focus": "Main Coder"}, {"Architect": "Ibrahim Sohail", "Focus": "Presentation Lead"}, {"Architect": "Daniyal Faraz", "Focus": "Debgger and Modifier"}])
 
 # ==============================================================================
 # 5. SOVEREIGN PORTAL (TABBED AUTH)
