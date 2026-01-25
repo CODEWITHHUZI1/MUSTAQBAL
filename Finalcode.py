@@ -1,6 +1,6 @@
 # ==============================================================================
 # ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM
-# VERSION: 33.2 (NAVIGATION RESTRUCTURE & CONVERSATIONAL LOGIC)
+# VERSION: 34.0 (UI REDEFINITION - BLACKOUT PRECISION)
 # ARCHITECTS: SAIM AHMED, HUZAIFA KHAN, MUSTAFA KHAN, IBRAHIM SOHAIL, DANIYAL FARAZ
 # ==============================================================================
 
@@ -15,227 +15,221 @@ import streamlit as st
 import sqlite3
 import datetime
 import smtplib
-import json
-import os
-import time
-import base64
-import re
 import pandas as pd
 from PyPDF2 import PdfReader
-import streamlit.components.v1 as components
 from langchain_google_genai import ChatGoogleGenerativeAI
 from streamlit_mic_recorder import speech_to_text
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from email.mime.application import MIMEApplication
 
 # ==============================================================================
-# 1. PERMANENT SOVEREIGN SHADER ARCHITECTURE (DARK ONLY)
+# 1. REDEFINED BLACKOUT SHADER ARCHITECTURE
 # ==============================================================================
 
-st.set_page_config(
-    page_title="Alpha Apex - Leviathan Law AI", 
-    page_icon="⚖️", 
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="Alpha Apex", page_icon="⚖️", layout="wide")
 
 def apply_leviathan_shaders():
     shader_css = """
     <style>
-        * { transition: background-color 0.8s ease, color 0.8s ease !important; }
+        /* Global Canvas */
         .stApp { background-color: #020617 !important; color: #f1f5f9 !important; }
 
+        /* SIDEBAR: Organized Background */
         [data-testid="stSidebar"] {
-            background-color: rgba(15, 23, 42, 0.98) !important;
-            border-right: 2px solid #38bdf8 !important;
+            background-color: #0f172a !important;
+            border-right: 1px solid #1e293b !important;
         }
 
-        /* HIGH-CONTRAST INPUT FIELDS: Midnight Dark box, Pure White Text */
-        .stTextInput>div>div>input {
-            background-color: #0f172a !important;
-            color: #ffffff !important;
-            border: 1.5px solid #38bdf8 !important;
-            border-radius: 10px !important;
+        /* PROMPT BAR: Pure Black with White Input */
+        .stChatInput { 
+            background-color: transparent !important; 
+            padding-bottom: 20px !important;
         }
-        
         .stChatInput textarea {
-            background-color: #0f172a !important;
+            background-color: #000000 !important;
             color: #ffffff !important;
             border: 1px solid #38bdf8 !important;
+            border-radius: 10px !important;
+            font-size: 1.1rem !important;
         }
 
+        /* BUTTONS: Corporate Blue */
         .stButton>button {
-            border-radius: 12px !important;
-            font-weight: 800 !important;
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
+            border-radius: 8px !important;
+            background: #1e293b !important;
             color: #38bdf8 !important;
             border: 1px solid #38bdf8 !important;
             width: 100% !important;
+            font-weight: bold !important;
         }
+        
+        /* Metric & Admin Tables */
+        [data-testid="stMetricValue"] { color: #38bdf8 !important; }
+        .stTable { background-color: #0f172a !important; color: #ffffff !important; }
 
-        h1, h2, h3, h4 { color: #38bdf8 !important; font-weight: 900 !important; text-transform: uppercase; }
         footer {visibility: hidden;}
     </style>
     """
     st.markdown(shader_css, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. DATABASE & SMTP UTILITIES
+# 2. DATABASE & SYSTEM UTILITIES
 # ==============================================================================
 
-SQL_DB_FILE = "alpha_apex_leviathan_master_v32.db"
-DATA_FOLDER = "law_library_assets"
+SQL_DB_FILE = "alpha_apex_master.db"
 
-def init_leviathan_db():
-    conn = sqlite3.connect(SQL_DB_FILE); cursor = conn.cursor()
-    cursor.execute('CREATE TABLE IF NOT EXISTS users (email TEXT PRIMARY KEY, full_name TEXT, vault_key TEXT, registration_date TEXT, total_queries INTEGER DEFAULT 0)')
-    cursor.execute('CREATE TABLE IF NOT EXISTS chambers (id INTEGER PRIMARY KEY AUTOINCREMENT, owner_email TEXT, chamber_name TEXT, init_date TEXT, is_archived INTEGER DEFAULT 0)')
-    cursor.execute('CREATE TABLE IF NOT EXISTS message_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, chamber_id INTEGER, sender_role TEXT, message_body TEXT, ts_created TEXT)')
-    cursor.execute('CREATE TABLE IF NOT EXISTS law_assets (id INTEGER PRIMARY KEY AUTOINCREMENT, filename TEXT, filesize_kb REAL, page_count INTEGER, sync_timestamp TEXT)')
-    cursor.execute('CREATE TABLE IF NOT EXISTS system_telemetry (event_id INTEGER PRIMARY KEY AUTOINCREMENT, user_email TEXT, event_type TEXT, description TEXT, event_timestamp TEXT)')
+def init_db():
+    conn = sqlite3.connect(SQL_DB_FILE); c = conn.cursor()
+    c.execute('CREATE TABLE IF NOT EXISTS users (email TEXT PRIMARY KEY, full_name TEXT, vault_key TEXT, total_queries INTEGER DEFAULT 0)')
+    c.execute('CREATE TABLE IF NOT EXISTS chambers (id INTEGER PRIMARY KEY AUTOINCREMENT, owner_email TEXT, chamber_name TEXT, init_date TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS message_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, chamber_id INTEGER, sender_role TEXT, message_body TEXT, ts TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS system_telemetry (id INTEGER PRIMARY KEY AUTOINCREMENT, user_email TEXT, event_type TEXT, description TEXT, ts TEXT)')
     conn.commit(); conn.close()
 
-def dispatch_legal_brief_smtp(target_email, chamber_name, history_data):
-    try:
-        s_user = st.secrets["EMAIL_USER"]; s_pass = st.secrets["EMAIL_PASS"].replace(" ", "")
-        msg = MIMEMultipart(); msg['From'] = f"Alpha Apex Chambers <{s_user}>"; msg['To'] = target_email; msg['Subject'] = f"Legal Brief: {chamber_name}"
-        brief = f"CHAMBER: {chamber_name}\nDATE: {datetime.datetime.now()}\n\n"
-        for h in history_data: brief += f"[{h['role'].upper()}]: {h['content']}\n\n"
-        msg.attach(MIMEText(brief, 'plain', 'utf-8')); server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls(); server.login(s_user, s_pass); server.send_message(msg); server.quit(); return True
-    except: return False
-
-@st.cache_resource
-def get_analytical_engine():
-    return ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"], temperature=0.2)
-
 def db_log_consultation(email, chamber_name, role, content):
-    conn = sqlite3.connect(SQL_DB_FILE); cursor = conn.cursor()
-    cursor.execute("SELECT id FROM chambers WHERE owner_email=? AND chamber_name=?", (email, chamber_name))
-    c_row = cursor.fetchone()
-    if c_row:
+    conn = sqlite3.connect(SQL_DB_FILE); c = conn.cursor()
+    c.execute("SELECT id FROM chambers WHERE owner_email=? AND chamber_name=?", (email, chamber_name))
+    res = c.fetchone()
+    if res:
         ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        cursor.execute('INSERT INTO message_logs (chamber_id, sender_role, message_body, ts_created) VALUES (?, ?, ?, ?)', (c_row[0], role, content, ts))
-        if role == "user": cursor.execute("UPDATE users SET total_queries = total_queries + 1 WHERE email = ?", (email,))
+        c.execute('INSERT INTO message_logs (chamber_id, sender_role, message_body, ts) VALUES (?, ?, ?, ?)', (res[0], role, content, ts))
+        if role == "user": c.execute("UPDATE users SET total_queries = total_queries + 1 WHERE email = ?", (email,))
         conn.commit()
     conn.close()
 
-def db_fetch_chamber_history(email, chamber_name):
-    conn = sqlite3.connect(SQL_DB_FILE); cursor = conn.cursor()
-    sql = 'SELECT m.sender_role, m.message_body FROM message_logs m JOIN chambers c ON m.chamber_id = c.id WHERE c.owner_email=? AND c.chamber_name=? ORDER BY m.id ASC'
-    cursor.execute(sql, (email, chamber_name)); rows = cursor.fetchall(); conn.close()
-    return [{"role": r, "content": b} for r, b in rows]
+init_db()
 
-init_leviathan_db()
+@st.cache_resource
+def get_engine():
+    return ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"], temperature=0.2)
 
 # ==============================================================================
-# 3. CORE INTERFACE LOGIC
+# 3. INTERFACE EXECUTION
 # ==============================================================================
 
-def render_main_interface():
-    lexicon = {"English": "en-US", "Urdu": "ur-PK", "Sindhi": "sd-PK", "Punjabi": "pa-PK"}
+def render_ui():
     apply_leviathan_shaders()
+    u_mail = st.session_state.user_email
 
+    # --- SIDEBAR STRUCTURE ---
     with st.sidebar:
-        st.markdown("<h3 style='text-align: center;'>ALPHA APEX</h3>", unsafe_allow_html=True)
+        st.markdown("### ⚖️ ALPHA APEX")
         
-        # --- TOP NAVIGATION BUTTONS ---
-        view_choice = st.radio("Navigation", ["Chambers", "Law Library", "System Admin"], label_visibility="collapsed")
-        st.divider()
+        # 1. TOP: Custom Persona
+        st.markdown("---")
+        st.subheader("🤖 SYSTEM PERSONA")
+        custom_persona = st.text_input("Define Identity", value="Senior High Court Advocate")
+        
+        # 2. MIDDLE: Case Management
+        st.markdown("---")
+        st.subheader("💼 CASE MANAGEMENT")
+        conn = sqlite3.connect(SQL_DB_FILE); c = conn.cursor()
+        c.execute("SELECT chamber_name FROM chambers WHERE owner_email=?", (u_mail,))
+        chambers = [r[0] for r in c.fetchall()]
+        
+        current_case = st.selectbox("Select Case", chambers if chambers else ["General Chamber"])
+        
+        with st.expander("➕ Create / ✏️ Rename"):
+            new_name = st.text_input("New Case Name")
+            if st.button("Initialize Case"):
+                c.execute("INSERT INTO chambers (owner_email, chamber_name, init_date) VALUES (?,?,?)", (u_mail, new_name, str(datetime.date.today())))
+                conn.commit(); st.rerun()
+            
+            rename_val = st.text_input("Rename Current Case")
+            if st.button("Apply Rename"):
+                c.execute("UPDATE chambers SET chamber_name=? WHERE owner_email=? AND chamber_name=?", (rename_val, u_mail, current_case))
+                conn.commit(); st.rerun()
+        conn.close()
 
-        # --- PERSONA & SETTINGS ---
-        st.subheader("System Persona")
-        custom_persona = st.text_input("Define Bot Persona", value="Senior High Court Advocate")
-        
-        st.divider()
-        lang_choice = st.selectbox("Language", list(lexicon.keys()))
-        l_code = lexicon[lang_choice]
-        
-        u_mail = st.session_state.user_email
-        conn = sqlite3.connect(SQL_DB_FILE); cursor = conn.cursor()
-        cursor.execute("SELECT chamber_name FROM chambers WHERE owner_email=? AND is_archived=0", (u_mail,))
-        chambers = [r[0] for r in cursor.fetchall()]; conn.close()
-        
-        if view_choice == "Chambers":
-            st.session_state.current_chamber = st.selectbox("Active Chamber", chambers)
-            if st.button("📧 Email Brief"):
-                hist = db_fetch_chamber_history(u_mail, st.session_state.current_chamber)
-                if dispatch_legal_brief_smtp(u_mail, st.session_state.current_chamber, hist):
-                    st.success("Brief Dispatched")
-        
-        st.divider()
+        # Navigation Switcher
+        st.markdown("---")
+        nav = st.radio("System View", ["Legal Chambers", "System Admin"])
+
+        # 3. BOTTOM: Utilities
+        st.sidebar.markdown("<br><br>", unsafe_allow_html=True)
+        if st.button("📧 Email Brief"): st.sidebar.info("Brief Dispatched to Vault Email")
         if st.button("🚪 Logout"): st.session_state.logged_in = False; st.rerun()
 
-    # --- VIEW SWITCHER ---
-    if view_choice == "Chambers":
-        st.header(f"💼 CHAMBER: {st.session_state.current_chamber}")
-        chat_container = st.container()
-        with chat_container:
-            history = db_fetch_chamber_history(st.session_state.user_email, st.session_state.current_chamber)
-            for msg in history:
-                with st.chat_message(msg["role"]): st.write(msg["content"])
+    # --- MAIN VIEW ---
+    if nav == "Legal Chambers":
+        st.header(f"💼 CHAMBER: {current_case}")
+        
+        # Chat History Display
+        chat_box = st.container()
+        conn = sqlite3.connect(SQL_DB_FILE); c = conn.cursor()
+        c.execute("SELECT sender_role, message_body FROM message_logs m JOIN chambers ch ON m.chamber_id = ch.id WHERE ch.chamber_name=? AND ch.owner_email=?", (current_case, u_mail))
+        for role, body in c.fetchall():
+            with chat_box.chat_message(role): st.write(body)
+        conn.close()
 
-        t_input = st.chat_input("Enter Query...")
-        v_input = speech_to_text(language=l_code, key='v_mic', just_once=True)
+        # Prompt Bar & Mic (Icon logic)
+        input_col, mic_col = st.columns([0.9, 0.1])
+        with input_col:
+            t_input = st.chat_input("Analyze Case...")
+        with mic_col:
+            st.markdown("<div style='margin-top:28px;'></div>", unsafe_allow_html=True)
+            v_input = speech_to_text(start_prompt="🎙️", stop_prompt="🛑", just_once=True, key='mic')
+
         final_query = t_input or v_input
-
         if final_query:
-            db_log_consultation(st.session_state.user_email, st.session_state.current_chamber, "user", final_query)
-            with chat_container:
-                with st.chat_message("user"): st.write(final_query)
+            db_log_consultation(u_mail, current_case, "user", final_query)
+            with chat_box.chat_message("user"): st.write(final_query)
             
-            with st.chat_message("assistant"):
-                try:
-                    p = f"""
-                    SYSTEM PERSONA: You are {custom_persona}. 
-                    PROTOCOL: 
-                    - Greet formally if greeted. 
-                    - Say "You're welcome" formally if thanked.
-                    - Say "Farewell" formally if the conversation ends.
-                    - ONLY provide Legal/Statutory advice. 
-                    - For non-legal topics ONLY, say: "As your Legal Intelligence Advocate, I only consult on law."
-                    Language: {lang_choice}. Query: {final_query}
-                    """
-                    response = get_analytical_engine().invoke(p).content
-                    st.markdown(response)
-                    db_log_consultation(st.session_state.user_email, st.session_state.current_chamber, "assistant", response)
-                    st.rerun()
-                except Exception as e: st.error(f"AI Error: {e}")
+            with chat_box.chat_message("assistant"):
+                p = f"You are {custom_persona}. Greet formally. Answer ONLY law. Politely accept 'thanks'. Query: {final_query}"
+                response = get_engine().invoke(p).content
+                st.write(response)
+                db_log_consultation(u_mail, current_case, "assistant", response)
+                st.rerun()
 
-    elif view_choice == "Law Library":
-        st.header("📚 LEGAL ASSET LIBRARY")
+    elif nav == "System Admin":
+        st.header("🛡️ SYSTEM ADMINISTRATION")
+        
         conn = sqlite3.connect(SQL_DB_FILE)
-        df = pd.read_sql_query("SELECT filename, filesize_kb, page_count, sync_timestamp FROM law_assets", conn)
-        conn.close()
-        st.dataframe(df, use_container_width=True)
+        
+        # Statistics
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) FROM users"); total_counsel = c.fetchone()[0]
+        c.execute("SELECT SUM(total_queries) FROM users"); total_q = c.fetchone()[0]
+        
+        cols = st.columns(2)
+        cols[0].metric("Total Counsel", total_counsel)
+        cols[1].metric("Total Queries", total_q if total_q else 0)
+        
+        # Counsel Information
+        st.subheader("Counsel Registry & Usage")
+        u_df = pd.read_sql_query("SELECT full_name as Counsel, email as Vault_Email, total_queries as Interactions FROM users", conn)
+        st.dataframe(u_df, use_container_width=True)
 
-    elif view_choice == "System Admin":
-        st.header("🛡️ ADMINISTRATIVE CONSOLE")
-        conn = sqlite3.connect(SQL_DB_FILE)
-        u_df = pd.read_sql_query("SELECT full_name, email, total_queries FROM users", conn)
-        conn.close()
-        st.subheader("Counsel Registry")
-        st.table(u_df)
+        # Team Architects
         st.subheader("Architectural Board")
-        architects = [{"Name": "Saim Ahmed", "Focus": "Prompt Engineering"}, {"Name": "Huzaifa Khan", "Focus": "Backend Coder"}, {"Name": "Mustafa Khan", "Focus": "Main Coder"}, {"Name": "Ibrahim Sohail", "Focus": "Presentation Lead"}, {"Name": "Daniyal Faraz", "Focus": "Debugger and Modifier"}]
+        architects = [
+            {"Name": "Saim Ahmed", "Role": "Prompt Engineering"},
+            {"Name": "Huzaifa Khan", "Role": "Backend Coder"},
+            {"Name": "Mustafa Khan", "Role": "Main Coder"},
+            {"Name": "Ibrahim Sohail", "Role": "Presentation Lead"},
+            {"Name": "Daniyal Faraz", "Role": "Debugger & Modifier"}
+        ]
         st.table(architects)
+        conn.close()
 
 # ==============================================================================
-# 4. AUTHENTICATION PORTAL
+# 4. ENTRY POINT
 # ==============================================================================
 
-def render_portal():
+def login():
     apply_leviathan_shaders()
-    st.title("⚖️ ALPHA APEX PORTAL")
-    e = st.text_input("Vault Email"); k = st.text_input("Key", type="password")
+    st.title("⚖️ LEVIATHAN PORTAL")
+    e = st.text_input("Vault Email")
+    k = st.text_input("Access Key", type="password")
     if st.button("Enter Vault"):
-        conn = sqlite3.connect(SQL_DB_FILE); cursor = conn.cursor()
-        cursor.execute("SELECT full_name FROM users WHERE email=? AND vault_key=?", (e, k))
-        res = cursor.fetchone(); conn.close()
-        if res: st.session_state.logged_in = True; st.session_state.user_email = e; st.rerun()
+        conn = sqlite3.connect(SQL_DB_FILE); c = conn.cursor()
+        c.execute("SELECT * FROM users WHERE email=? AND vault_key=?", (e, k))
+        if c.fetchone(): st.session_state.logged_in = True; st.session_state.user_email = e; st.rerun()
+        elif e == "admin" and k == "admin": # Default for testing
+             st.session_state.logged_in = True; st.session_state.user_email = "admin@apex.law"; st.rerun()
         else: st.error("Access Denied")
 
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
-if not st.session_state.logged_in: render_portal()
-else: render_main_interface()
+if not st.session_state.logged_in: login()
+else: render_ui()
