@@ -137,7 +137,7 @@ init_leviathan_db()
 
 @st.cache_resource
 def get_analytical_engine():
-    return ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"], temperature=0.2)
+    return ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"], temperature=0.2)
 
 # ==============================================================================
 # 4. MAIN INTERFACE
@@ -266,3 +266,4 @@ def render_sovereign_portal():
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 if not st.session_state.logged_in: render_sovereign_portal()
 else: render_main_interface()
+
