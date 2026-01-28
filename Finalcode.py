@@ -42,7 +42,7 @@ import re
 import pandas as pd
 from PyPDF2 import PdfReader
 import streamlit.components.v1 as components
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_genai import ChatGoogleGenerativeAI, HarmBlockThreshold, HarmCategory
 from streamlit_mic_recorder import speech_to_text
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -277,9 +277,6 @@ def apply_leviathan_shaders():
     """
     st.markdown(shader_css, unsafe_allow_html=True)
 
-# ------------------------------------------------------------------------------
-# SECTION 4: RELATIONAL DATABASE PERSISTENCE ENGINE (SQLITE3)
-# ------------------------------------------------------------------------------
 
 # ------------------------------------------------------------------------------
 # SECTION 4: RELATIONAL DATABASE PERSISTENCE ENGINE (SQLITE3)
@@ -490,13 +487,28 @@ init_leviathan_db()
 
 @st.cache_resource
 def get_analytical_engine():
-    """Configures the Gemini 1.5 High-Context Model for Legal Analysis."""
+    """Configures the Gemini 1.5 High-Context Model for Legal Analysis with Safety Bypass."""
     try:
+        # Check if key exists to prevent silent failure
+        if "GOOGLE_API_KEY" not in st.secrets:
+            st.error("MISSING API KEY in Streamlit Secrets.")
+            return None
+            
         api_key = st.secrets["GOOGLE_API_KEY"]
+        
+        # This configuration prevents the 'redacted' error for legal content
+        safety_settings = {
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+        }
+
         return ChatGoogleGenerativeAI(
             model="gemini-1.5-flash", 
             google_api_key=api_key, 
-            temperature=0.0
+            temperature=0.0,
+            safety_settings=safety_settings
         )
     except Exception as e:
         st.error(f"AI ENGINE INITIALIZATION ERROR: {e}")
