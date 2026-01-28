@@ -51,7 +51,7 @@ st.set_page_config(
     page_title=SYSTEM_CONFIG["APP_NAME"], 
     page_icon=SYSTEM_CONFIG["APP_ICON"], 
     layout=SYSTEM_CONFIG["LAYOUT"],
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="auto"  # Let Streamlit handle sidebar state
 )
 
 # Initialize theme and sidebar state in session state
@@ -125,30 +125,9 @@ def apply_enhanced_shaders():
     
     components.html(sidebar_script, height=0)
     
-    # Sidebar visibility control - FIX: Show sidebar properly
-    if st.session_state.sidebar_visible:
-        sidebar_css = """
-        [data-testid="stSidebar"] {
-            visibility: visible !important;
-            transform: translateX(0) !important;
-            transition: transform 0.3s ease !important;
-        }
-        """
-    else:
-        sidebar_css = """
-        [data-testid="stSidebar"] {
-            visibility: hidden !important;
-            transform: translateX(-100%) !important;
-            transition: transform 0.3s ease, visibility 0.3s ease !important;
-        }
-        """
-    
     shader_css = f"""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=Space+Mono:wght@400;700&display=swap');
-        
-        /* Sidebar visibility control */
-        {sidebar_css}
         
         /* Menu Button Styling */
         .menu-toggle-btn {{
@@ -910,16 +889,10 @@ def render_google_sign_in():
 def render_main_interface():
     apply_enhanced_shaders()
     
-    # Menu Toggle Button - Top Left (ALWAYS VISIBLE)
-    menu_col1, menu_col2, menu_col3 = st.columns([1, 5, 1])
+    # Top bar with theme toggle only
+    col1, col2, col3 = st.columns([1, 5, 1])
     
-    with menu_col1:
-        menu_button_text = "✕ Close" if st.session_state.sidebar_visible else "☰ Menu"
-        if st.button(menu_button_text, key="menu_toggle_btn", use_container_width=True):
-            st.session_state.sidebar_visible = not st.session_state.sidebar_visible
-            st.rerun()
-    
-    with menu_col3:
+    with col3:
         if st.session_state.theme_mode == "dark":
             if st.button("☀️ Light", key="theme_toggle"):
                 st.session_state.theme_mode = "light"
@@ -936,122 +909,115 @@ def render_main_interface():
         "Punjabi": "pa-PK"
     }
 
-    # --- SIDEBAR (controlled by session state) ---
-    if st.session_state.sidebar_visible:
-        with st.sidebar:
-            st.markdown("<div class='logo-text'>⚖️ ALPHA APEX</div>", unsafe_allow_html=True)
-            st.markdown("<div class='sub-logo-text'>Leviathan Suite v38.1</div>", unsafe_allow_html=True)
+    # --- SIDEBAR (ALWAYS VISIBLE) ---
+    with st.sidebar:
+        st.markdown("<div class='logo-text'>⚖️ ALPHA APEX</div>", unsafe_allow_html=True)
+        st.markdown("<div class='sub-logo-text'>Leviathan Suite v38.1</div>", unsafe_allow_html=True)
+        
+        st.markdown("**Sovereign Navigation Hub**")
+        nav_mode = st.radio(
+            "Navigation", 
+            ["Chambers", "Law Library", "System Admin"], 
+            label_visibility="collapsed"
+        )
+        
+        st.divider()
+        
+        if nav_mode == "Chambers":
+            st.markdown("**Active Case Files**")
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT chamber_name FROM chambers WHERE owner_email=?", (st.session_state.user_email,))
+            user_chambers = [r[0] for r in cursor.fetchall()]
+            conn.close()
             
-            st.markdown("**Sovereign Navigation Hub**")
-            nav_mode = st.radio(
-                "Navigation", 
-                ["Chambers", "Law Library", "System Admin"], 
+            if not user_chambers:
+                user_chambers = ["General Litigation Chamber"]
+                
+            st.session_state.active_ch = st.radio(
+                "Select Case", 
+                user_chambers, 
                 label_visibility="collapsed"
             )
-            st.session_state.nav_mode = nav_mode  # Store for use when sidebar is hidden
             
-            st.divider()
+            # Action Buttons
+            col_add, col_del = st.columns(2)
+            with col_add:
+                if st.button("➕ New Case"):
+                    st.session_state.show_new_case_modal = True
+            with col_del:
+                if st.button("🗑️ Delete Case"):
+                    if st.session_state.active_ch != "General Litigation Chamber":
+                        st.session_state.show_delete_modal = True
+                    else:
+                        st.warning("Cannot delete default chamber")
             
-            if nav_mode == "Chambers":
-                st.markdown("**Active Case Files**")
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("SELECT chamber_name FROM chambers WHERE owner_email=?", (st.session_state.user_email,))
-                user_chambers = [r[0] for r in cursor.fetchall()]
-                conn.close()
-                
-                if not user_chambers:
-                    user_chambers = ["General Litigation Chamber"]
-                    
-                st.session_state.active_ch = st.radio(
-                    "Select Case", 
-                    user_chambers, 
-                    label_visibility="collapsed"
-                )
-                
-                # Action Buttons
-                col_add, col_del = st.columns(2)
-                with col_add:
-                    if st.button("➕ New Case"):
-                        st.session_state.show_new_case_modal = True
-                with col_del:
-                    if st.button("🗑️ Delete Case"):
-                        if st.session_state.active_ch != "General Litigation Chamber":
-                            st.session_state.show_delete_modal = True
-                        else:
-                            st.warning("Cannot delete default chamber")
-                
-                # New Case Modal
-                if st.session_state.get('show_new_case_modal', False):
-                    new_case_name = st.text_input("Enter New Case Name:", key="new_case_input")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if st.button("Create", key="create_case_btn"):
-                            if new_case_name:
-                                if db_create_new_chamber(st.session_state.user_email, new_case_name):
-                                    st.success(f"✓ Created: {new_case_name}")
-                                    st.session_state.show_new_case_modal = False
-                                    st.session_state.active_ch = new_case_name
-                                    time.sleep(1)
-                                    st.rerun()
-                                else:
-                                    st.error("Case already exists or error occurred")
-                    with col2:
-                        if st.button("Cancel", key="cancel_case_btn"):
-                            st.session_state.show_new_case_modal = False
-                            st.rerun()
-                
-                # Delete Case Modal
-                if st.session_state.get('show_delete_modal', False):
-                    st.warning(f"⚠️ Delete '{st.session_state.active_ch}'?")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if st.button("Yes, Delete", key="confirm_delete_btn"):
-                            if db_delete_chamber(st.session_state.user_email, st.session_state.active_ch):
-                                st.success("✓ Case Deleted")
-                                st.session_state.active_ch = "General Litigation Chamber"
-                                st.session_state.show_delete_modal = False
+            # New Case Modal
+            if st.session_state.get('show_new_case_modal', False):
+                new_case_name = st.text_input("Enter New Case Name:", key="new_case_input")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("Create", key="create_case_btn"):
+                        if new_case_name:
+                            if db_create_new_chamber(st.session_state.user_email, new_case_name):
+                                st.success(f"✓ Created: {new_case_name}")
+                                st.session_state.show_new_case_modal = False
+                                st.session_state.active_ch = new_case_name
                                 time.sleep(1)
                                 st.rerun()
-                    with col2:
-                        if st.button("Cancel", key="cancel_delete_btn"):
-                            st.session_state.show_delete_modal = False
-                            st.rerun()
-                
-                st.divider()
-                
-                # Email Brief Button
-                if st.button("📧 Email Brief", use_container_width=True):
-                    hist = db_fetch_chamber_history(st.session_state.user_email, st.session_state.active_ch)
-                    if hist:
-                        with st.spinner("Sending email..."):
-                            if dispatch_legal_brief(st.session_state.user_email, st.session_state.active_ch, hist):
-                                st.success("✓ Brief sent to your email!")
-                                db_log_event(st.session_state.user_email, "EMAIL_BRIEF", f"Sent brief for {st.session_state.active_ch}")
                             else:
-                                st.error("Failed to send email")
-                    else:
-                        st.warning("No conversation to send")
-
+                                st.error("Case already exists or error occurred")
+                with col2:
+                    if st.button("Cancel", key="cancel_case_btn"):
+                        st.session_state.show_new_case_modal = False
+                        st.rerun()
+            
+            # Delete Case Modal
+            if st.session_state.get('show_delete_modal', False):
+                st.warning(f"⚠️ Delete '{st.session_state.active_ch}'?")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("Yes, Delete", key="confirm_delete_btn"):
+                        if db_delete_chamber(st.session_state.user_email, st.session_state.active_ch):
+                            st.success("✓ Case Deleted")
+                            st.session_state.active_ch = "General Litigation Chamber"
+                            st.session_state.show_delete_modal = False
+                            time.sleep(1)
+                            st.rerun()
+                with col2:
+                    if st.button("Cancel", key="cancel_delete_btn"):
+                        st.session_state.show_delete_modal = False
+                        st.rerun()
+            
             st.divider()
             
-            with st.expander("⚙️ Advanced Settings"):
-                st.caption("AI Configuration")
-                sys_persona = st.text_input("Assistant Persona", value="Senior High Court Advocate")
-                sys_lang = st.selectbox("Response Language", list(lexicon.keys()))
-                
-                st.caption("Response Format")
-                st.info("📋 IRAC Format Enabled")
-                
-                st.divider()
-                if st.button("🚪 Secure Logout", use_container_width=True):
-                    st.session_state.logged_in = False
-                    st.rerun()
-    else:
-        # Default values when sidebar is hidden
-        nav_mode = st.session_state.get('nav_mode', 'Chambers')
-        sys_persona = "Senior High Court Advocate"
-        sys_lang = "English"
+            # Email Brief Button
+            if st.button("📧 Email Brief", use_container_width=True):
+                hist = db_fetch_chamber_history(st.session_state.user_email, st.session_state.active_ch)
+                if hist:
+                    with st.spinner("Sending email..."):
+                        if dispatch_legal_brief(st.session_state.user_email, st.session_state.active_ch, hist):
+                            st.success("✓ Brief sent to your email!")
+                            db_log_event(st.session_state.user_email, "EMAIL_BRIEF", f"Sent brief for {st.session_state.active_ch}")
+                        else:
+                            st.error("Failed to send email")
+                else:
+                    st.warning("No conversation to send")
+
+        st.divider()
+        
+        with st.expander("⚙️ Advanced Settings"):
+            st.caption("AI Configuration")
+            sys_persona = st.text_input("Assistant Persona", value="Senior High Court Advocate")
+            sys_lang = st.selectbox("Response Language", list(lexicon.keys()))
+            
+            st.caption("Response Format")
+            st.info("📋 IRAC Format Enabled")
+            
+            st.divider()
+            if st.button("🚪 Secure Logout", use_container_width=True):
+                st.session_state.logged_in = False
+                st.rerun()
 
     # --- MAIN CONTENT ---
     if nav_mode == "Chambers":
