@@ -1,6 +1,6 @@
 # ==============================================================================
 # ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM
-# VERSION: 36.4 (HACKATHON UI ENHANCED - GLASSMORPHISM EDITION)
+# VERSION: 36.5 (REGISTRATION RESTORED & UI ENHANCED)
 # ARCHITECTS: SAIM AHMED, HUZAIFA KHAN, MUSTAFA KHAN, IBRAHIM SOHAIL, DANIYAL FARAZ
 # ==============================================================================
 
@@ -96,6 +96,17 @@ def init_leviathan_db():
     cursor.execute('CREATE TABLE IF NOT EXISTS message_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, chamber_id INTEGER, sender_role TEXT, message_body TEXT, ts_created TEXT, token_count INTEGER DEFAULT 0)')
     cursor.execute('CREATE TABLE IF NOT EXISTS law_assets (id INTEGER PRIMARY KEY AUTOINCREMENT, filename TEXT, filesize_kb REAL, page_count INTEGER, sync_timestamp TEXT, asset_status TEXT DEFAULT "Verified")')
     conn.commit(); conn.close()
+
+def db_create_vault_user(email, name, password):
+    if not email or not password: return False
+    conn = sqlite3.connect(SQL_DB_FILE); cursor = conn.cursor()
+    ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        cursor.execute('INSERT INTO users (email, full_name, vault_key, registration_date) VALUES (?, ?, ?, ?)', (email, name, password, ts))
+        cursor.execute('INSERT INTO chambers (owner_email, chamber_name, init_date) VALUES (?, ?, ?)', (email, "General Litigation Chamber", ts))
+        conn.commit(); conn.close(); return True
+    except sqlite3.IntegrityError:
+        conn.close(); return False
 
 def db_verify_vault_access(email, password):
     conn = sqlite3.connect(SQL_DB_FILE); cursor = conn.cursor()
@@ -236,7 +247,14 @@ def render_sovereign_portal():
                 st.rerun()
             else: st.error("Denied")
     with auth_tabs[1]:
-        st.info("Registration temporarily locked for audit.")
+        e_reg = st.text_input("Registry Email", key="reg_email")
+        n_reg = st.text_input("Counsel Full Name", key="reg_name")
+        k_reg = st.text_input("Set Security Key", type="password", key="reg_key")
+        if st.button("Initialize Registry"):
+            if db_create_vault_user(e_reg, n_reg, k_reg):
+                st.success("Counsel Registered Successfully")
+            else:
+                st.error("Registry Failed: User may already exist.")
 
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 if not st.session_state.logged_in: render_sovereign_portal()
