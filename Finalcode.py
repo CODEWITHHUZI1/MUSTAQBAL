@@ -92,31 +92,33 @@ def apply_enhanced_shaders():
         prompt_area_bg = "#ffffff"
     
     # Add JavaScript for sidebar control
-sidebar_script = """
-<script>
-let sidebarOpen = true;
+    # Add JavaScript for sidebar control
+    sidebar_script = """
+    <script>
+    let sidebarOpen = true;
 
-function toggleSidebar() {
-    const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
-    const main = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
+    function toggleSidebar() {
+        const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
+        const main = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
 
-    if (!sidebar) return;
+        if (!sidebar) return;
 
-    if (sidebarOpen) {
-        sidebar.style.transform = "translateX(-105%)";
-        sidebar.style.transition = "transform 0.3s ease";
-        if (main) main.style.marginLeft = "0px";
-        sidebarOpen = false;
-    } else {
-        sidebar.style.transform = "translateX(0px)";
-        sidebar.style.transition = "transform 0.3s ease";
-        if (main) main.style.marginLeft = "300px";
-        sidebarOpen = true;
+        if (sidebarOpen) {
+            sidebar.style.transform = "translateX(-105%)";
+            sidebar.style.transition = "transform 0.3s ease";
+            if (main) main.style.marginLeft = "0px";
+            sidebarOpen = false;
+        } else {
+            sidebar.style.transform = "translateX(0px)";
+            sidebar.style.transition = "transform 0.3s ease";
+            if (main) main.style.marginLeft = "300px";
+            sidebarOpen = true;
+        }
     }
-}
-</script>
-"""
-components.html(sidebar_script, height=0)
+    </script>
+    """
+    components.html(sidebar_script, height=0)
+
     
     shader_css = f"""
     <style>
