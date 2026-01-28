@@ -1,6 +1,6 @@
 # ==============================================================================
 # ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM
-# VERSION: 36.6 (ADMIN CONSOLE RESTORED & UI STABILITY)
+# VERSION: 36.7 (UI READABILITY & CONTRAST FIX)
 # ARCHITECTS: SAIM AHMED, HUZAIFA KHAN, MUSTAFA KHAN, IBRAHIM SOHAIL, DANIYAL FARAZ
 # ==============================================================================
 
@@ -21,7 +21,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from streamlit_mic_recorder import speech_to_text
 
 # ==============================================================================
-# 1. PREMIUM HACKATHON SHADER ARCHITECTURE
+# 1. PREMIUM HACKATHON SHADER ARCHITECTURE (FIXED CONTRAST)
 # ==============================================================================
 
 st.set_page_config(
@@ -34,29 +34,50 @@ st.set_page_config(
 def apply_leviathan_shaders():
     shader_css = """
     <style>
+        /* GLASSMORPHISM SIDEBAR */
         [data-testid="stSidebar"] {
-            background: rgba(2, 6, 23, 0.85) !important;
-            backdrop-filter: blur(12px);
+            background: rgba(2, 6, 23, 0.92) !important;
+            backdrop-filter: blur(15px);
             border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
         }
-        [data-testid="stMetricValue"] { font-size: 1.8rem !important; color: #f8fafc !important; }
+        
+        /* FIX FOR LIGHT/FADED SIDEBAR TEXT */
+        [data-testid="stSidebar"] .stRadio label, 
+        [data-testid="stSidebar"] p, 
+        [data-testid="stSidebar"] span {
+            color: #ffffff !important;
+            font-weight: 500 !important;
+            opacity: 1 !important;
+        }
+        
+        /* METRIC CARDS STYLE */
+        [data-testid="stMetricValue"] {
+            font-size: 1.8rem !important;
+            color: #f8fafc !important;
+        }
+        
         div[data-testid="metric-container"] {
             background: rgba(30, 41, 59, 0.4);
             padding: 15px;
             border-radius: 12px;
             border: 1px solid rgba(255, 255, 255, 0.05);
         }
+
+        /* CHAT BUBBLE ENHANCEMENTS */
         .stChatMessage {
             background: rgba(30, 41, 59, 0.25) !important;
             border: 1px solid rgba(255, 255, 255, 0.08) !important;
             border-radius: 15px !important;
         }
+
+        /* LOGO GRADIENT */
         .logo-text { 
-            background: linear-gradient(90deg, #f8fafc, #94a3b8);
+            background: linear-gradient(90deg, #ffffff, #cbd5e1);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             font-size: 28px; font-weight: 800; 
         }
+        
         footer {visibility: hidden;}
     </style>
     """
