@@ -1,6 +1,6 @@
 # ==============================================================================
 # ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM
-# VERSION: 36.4 (INTEGRATED PDF INGESTION)
+# VERSION: 36.5 (UI VISIBILITY PATCH)
 # ==============================================================================
 
 try:
@@ -62,11 +62,20 @@ def apply_leviathan_shaders():
         h1, h2, h3, h4 { color: #f8fafc !important; font-weight: 700 !important; }
         .logo-text { color: #f8fafc; font-size: 24px; font-weight: bold; }
         .sub-logo-text { color: #94a3b8; font-size: 12px; }
+        
+        /* DARK BUTTON ENHANCEMENT */
         .stButton>button {
             border-radius: 8px !important;
             background: #1e293b !important;
-            color: #cbd5e1 !important;
-            border: 1px solid #334155 !important;
+            color: #ffffff !important;
+            border: 1px solid #475569 !important;
+            font-weight: 600 !important;
+            width: 100%;
+        }
+        .stButton>button:hover {
+            background: #334155 !important;
+            border-color: #64748b !important;
+            color: #ffffff !important;
         }
 
         /* STRICT WHITE TEXT FOR INPUTS */
@@ -151,7 +160,7 @@ init_leviathan_db()
 
 @st.cache_resource
 def get_analytical_engine():
-    return ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"], temperature=0.2)
+    return ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=st.secrets["GOOGLE_API_KEY"], temperature=0.2)
 
 def extract_pdf_text(uploaded_file):
     """Helper function to parse PDF content."""
@@ -298,8 +307,6 @@ def render_main_interface():
 
     elif nav_mode == "Law Library":
         st.header("📚 Law Library Vault")
-        
-        # --- NEW: PDF UPLOADER INTEGRATION ---
         st.markdown("### 📥 Sync New legal Asset")
         uploaded_file = st.file_uploader("Upload Pakistani Statute or Case Law (PDF)", type="pdf")
         
