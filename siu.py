@@ -1,6 +1,6 @@
 # ==============================================================================
 # ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM
-# VERSION: 36.7 (UI READABILITY & CONTRAST FIX)
+# VERSION: 36.8 (LEGAL CONTEXT GUARD & CHAT FLOW OPTIMIZED)
 # ARCHITECTS: SAIM AHMED, HUZAIFA KHAN, MUSTAFA KHAN, IBRAHIM SOHAIL, DANIYAL FARAZ
 # ==============================================================================
 
@@ -16,12 +16,13 @@ import sqlite3
 import datetime
 import os
 import time
+import re
 import pandas as pd
 from langchain_google_genai import ChatGoogleGenerativeAI
 from streamlit_mic_recorder import speech_to_text
 
 # ==============================================================================
-# 1. PREMIUM HACKATHON SHADER ARCHITECTURE (FIXED CONTRAST)
+# 1. PREMIUM HACKATHON SHADER ARCHITECTURE
 # ==============================================================================
 
 st.set_page_config(
@@ -34,50 +35,32 @@ st.set_page_config(
 def apply_leviathan_shaders():
     shader_css = """
     <style>
-        /* GLASSMORPHISM SIDEBAR */
         [data-testid="stSidebar"] {
             background: rgba(2, 6, 23, 0.92) !important;
             backdrop-filter: blur(15px);
             border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
         }
-        
-        /* FIX FOR LIGHT/FADED SIDEBAR TEXT */
-        [data-testid="stSidebar"] .stRadio label, 
-        [data-testid="stSidebar"] p, 
-        [data-testid="stSidebar"] span {
+        [data-testid="stSidebar"] .stRadio label, [data-testid="stSidebar"] p, [data-testid="stSidebar"] span {
             color: #ffffff !important;
             font-weight: 500 !important;
-            opacity: 1 !important;
         }
-        
-        /* METRIC CARDS STYLE */
-        [data-testid="stMetricValue"] {
-            font-size: 1.8rem !important;
-            color: #f8fafc !important;
-        }
-        
         div[data-testid="metric-container"] {
             background: rgba(30, 41, 59, 0.4);
             padding: 15px;
             border-radius: 12px;
             border: 1px solid rgba(255, 255, 255, 0.05);
         }
-
-        /* CHAT BUBBLE ENHANCEMENTS */
         .stChatMessage {
             background: rgba(30, 41, 59, 0.25) !important;
             border: 1px solid rgba(255, 255, 255, 0.08) !important;
             border-radius: 15px !important;
         }
-
-        /* LOGO GRADIENT */
         .logo-text { 
             background: linear-gradient(90deg, #ffffff, #cbd5e1);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             font-size: 28px; font-weight: 800; 
         }
-        
         footer {visibility: hidden;}
     </style>
     """
@@ -137,7 +120,7 @@ init_leviathan_db()
 
 @st.cache_resource
 def get_analytical_engine():
-    return ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"], temperature=0.2)
+    return ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"], temperature=0.2)
 
 # ==============================================================================
 # 4. MAIN INTERFACE
@@ -180,7 +163,7 @@ def render_main_interface():
             judge_mode = st.toggle("⚖️ JUDGE mode")
         with action_col:
             st.write(" ")
-            if st.button("📧 Email"): st.toast("Dispatching...")
+            if st.button("💾 Save Brief"): st.toast("Brief Saved Locally.")
 
         chat_container = st.container()
         with chat_container:
@@ -199,17 +182,41 @@ def render_main_interface():
             db_log_consultation(st.session_state.user_email, st.session_state.current_chamber, "user", final_query)
             with chat_container:
                 with st.chat_message("user"): st.write(final_query)
+            
+            # GREETING/FAREWELL CHECKER (QUICK RESPONSE)
+            clean_q = final_query.lower().strip()
+            greetings = ["hi", "hello", "hey", "salaam", "greetings", "good morning", "good evening"]
+            farewells = ["bye", "goodbye", "exit", "thanks", "thank you", "jazakallah"]
+            
+            quick_resp = None
+            if any(word == clean_q for word in greetings):
+                quick_resp = "Greetings, Counsel. How may I assist with your legal proceedings today?"
+            elif any(word in clean_q for word in farewells):
+                quick_resp = "Understood. I remain at your disposal for future legal analysis. Case adjourned."
+
             with st.chat_message("assistant"):
-                with st.spinner("Analyzing..."):
-                    try:
-                        active_persona = "High Court Justice" if judge_mode else custom_persona
-                        jurisdiction_fix = "JURISDICTION: Strict Pakistan/Sindh. NO Indian law. FORMAT: IRAC."
-                        instruction = f"{active_persona}. {jurisdiction_fix}. Query: {final_query}"
-                        resp = get_analytical_engine().invoke(instruction).content
-                        st.markdown(resp)
-                        db_log_consultation(st.session_state.user_email, st.session_state.current_chamber, "assistant", resp)
-                        st.rerun()
-                    except Exception as e: st.error(f"Error: {e}")
+                if quick_resp:
+                    st.write(quick_resp)
+                    db_log_consultation(st.session_state.user_email, st.session_state.current_chamber, "assistant", quick_resp)
+                    st.rerun()
+                else:
+                    with st.spinner("Analyzing Statutes..."):
+                        try:
+                            active_persona = "High Court Justice" if judge_mode else custom_persona
+                            # STRICT LEGAL GUARD & NO EMAIL FORMAT INSTRUCTION
+                            guard = """
+                            STRICT LIMITATION: You are a Legal Intelligence System. 
+                            1. ONLY answer questions related to Law, Statutes, and Legal Procedures of Pakistan/Sindh.
+                            2. IF a user asks about non-legal topics (weather, food, generic advice), politely state: 'I am optimized solely for legal intelligence and cannot assist with non-legal queries.'
+                            3. DO NOT format your response as an email. Provide a direct legal analysis.
+                            4. FORMAT: IRAC (Issue, Rule, Application, Conclusion).
+                            """
+                            instruction = f"{active_persona}. {guard} Query: {final_query}"
+                            resp = get_analytical_engine().invoke(instruction).content
+                            st.markdown(resp)
+                            db_log_consultation(st.session_state.user_email, st.session_state.current_chamber, "assistant", resp)
+                            st.rerun()
+                        except Exception as e: st.error(f"Error: {e}")
 
     elif nav_mode == "Law Library":
         st.header("📚 Law Library Vault")
@@ -266,4 +273,3 @@ def render_sovereign_portal():
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 if not st.session_state.logged_in: render_sovereign_portal()
 else: render_main_interface()
-
