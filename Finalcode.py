@@ -1,8 +1,8 @@
 # ==============================================================================
-# ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM - v38.0
+# ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM - v38.1
 # ==============================================================================
-# SYSTEM VERSION: 38.0 (COMPLETE FEATURE SET)
-# ALL FEATURES FUNCTIONAL + LIGHT/DARK MODE + ENHANCED ADMIN PANEL
+# SYSTEM VERSION: 38.1 (UPGRADED)
+# NEW FEATURES: Sidebar Toggle Button + Mic Button at Prompt Bar
 # ==============================================================================
 
 try:
@@ -41,7 +41,7 @@ SYSTEM_CONFIG = {
     "THEME_PRIMARY": "#0b1120",
     "DB_FILENAME": "advocate_ai_v2.db",
     "DATA_REPOSITORY": "data",
-    "VERSION_ID": "38.0.0-COMPLETE",
+    "VERSION_ID": "38.1.0-UPGRADED",
     "LOG_LEVEL": "STRICT",
     "SMTP_SERVER": "smtp.gmail.com",
     "SMTP_PORT": 587
@@ -54,29 +54,31 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Initialize theme in session state
+# Initialize theme and sidebar state
 if "theme_mode" not in st.session_state:
     st.session_state.theme_mode = "dark"
+if "sidebar_state" not in st.session_state:
+    st.session_state.sidebar_state = "expanded"
 
 # ------------------------------------------------------------------------------
-# SECTION 3: ENHANCED SHADER WITH LIGHT/DARK MODE
+# SECTION 3: ENHANCED SHADER WITH LIGHT/DARK MODE + SIDEBAR TOGGLE
 # ------------------------------------------------------------------------------
 
 def apply_enhanced_shaders():
-    """Enhanced CSS with light/dark mode support"""
+    """Enhanced CSS with light/dark mode support and sidebar toggle"""
     
     # Define color schemes
     if st.session_state.theme_mode == "dark":
         bg_primary = "#0b1120"
         bg_secondary = "#1a1f3a"
         bg_tertiary = "#1e293b"
-        text_primary = "#e8edf4"  # Lighter text
-        text_secondary = "#b4bdd0"  # Lighter secondary text
+        text_primary = "#e8edf4"
+        text_secondary = "#b4bdd0"
         border_color = "rgba(56, 189, 248, 0.2)"
         input_bg = "rgba(30, 41, 59, 0.6)"
         sidebar_bg = "rgba(2, 6, 23, 0.8)"
         chat_bg = "rgba(30, 41, 59, 0.4)"
-        prompt_area_bg = "#0a0f1a"  # Black background for prompt area
+        prompt_area_bg = "#0a0f1a"
     else:
         bg_primary = "#f8fafc"
         bg_secondary = "#e2e8f0"
@@ -92,6 +94,32 @@ def apply_enhanced_shaders():
     shader_css = f"""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=Space+Mono:wght@400;700&display=swap');
+        
+        /* Sidebar Toggle Button (Top Left) */
+        .sidebar-toggle-btn {{
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 999999;
+            background: linear-gradient(135deg, {bg_tertiary} 0%, {bg_secondary} 100%);
+            border: 1px solid {border_color};
+            border-radius: 12px;
+            padding: 10px 15px;
+            cursor: pointer;
+            color: {text_primary};
+            font-weight: 700;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }}
+        
+        .sidebar-toggle-btn:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+            border-color: #38bdf8;
+        }}
         
         /* Theme Toggle Button */
         .theme-toggle {{
@@ -213,54 +241,60 @@ def apply_enhanced_shaders():
             box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2) !important;
         }}
         
-        /* Chat Input Container - BLACK BACKGROUND */
+        /* Chat Input Container */
         .stChatInputContainer {{
             background: {prompt_area_bg} !important;
             backdrop-filter: blur(10px) !important;
             border-top: 1px solid {border_color} !important;
             padding: 20px !important;
+            position: relative !important;
         }}
         
-        /* Chat Input Field */
+        /* Chat Input Field - with space for mic button */
         .stChatInput>div>div>textarea {{
             background: {input_bg} !important;
             color: {text_primary} !important;
             border: 1px solid {border_color} !important;
             border-radius: 12px !important;
-            padding: 14px 18px !important;
-            padding-right: 60px !important;
+            padding: 14px 60px 14px 18px !important;
             min-height: 60px !important;
             font-size: 15px !important;
         }}
         
-        /* Microphone Button - NEXT TO PROMPT BAR */
-        .stChatInput {{
-            position: relative !important;
-        }}
-        
-        .mic-button-container {{
+        /* Microphone Button - INSIDE PROMPT BAR */
+        .mic-in-prompt {{
             position: absolute !important;
-            right: 15px !important;
-            bottom: 15px !important;
-            z-index: 100 !important;
+            right: 30px !important;
+            bottom: 35px !important;
+            z-index: 1000 !important;
         }}
         
-        .mic-button-container button {{
+        .mic-in-prompt button {{
             background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important; 
             border: none !important; 
             border-radius: 50% !important;
-            width: 45px !important;
-            height: 45px !important;
+            width: 40px !important;
+            height: 40px !important;
+            min-width: 40px !important;
+            min-height: 40px !important;
+            padding: 0 !important;
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
-            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4) !important;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4) !important;
             cursor: pointer !important;
+            transition: all 0.2s ease !important;
         }}
         
-        .mic-button-container button:hover {{
+        .mic-in-prompt button:hover {{
             transform: scale(1.1) !important;
-            box-shadow: 0 6px 25px rgba(239, 68, 68, 0.6) !important;
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.6) !important;
+        }}
+        
+        .mic-in-prompt button svg {{
+            width: 20px !important;
+            height: 20px !important;
+            fill: white !important;
         }}
         
         /* Radio Buttons */
@@ -570,7 +604,6 @@ def db_create_new_chamber(email, chamber_name):
     
     try:
         cursor = conn.cursor()
-        # Check if chamber already exists
         cursor.execute("SELECT id FROM chambers WHERE owner_email=? AND chamber_name=?", (email, chamber_name))
         if cursor.fetchone():
             return False
@@ -597,15 +630,12 @@ def db_delete_chamber(email, chamber_name):
     
     try:
         cursor = conn.cursor()
-        # Get chamber ID
         cursor.execute("SELECT id FROM chambers WHERE owner_email=? AND chamber_name=?", (email, chamber_name))
         result = cursor.fetchone()
         
         if result:
             chamber_id = result[0]
-            # Delete all messages in this chamber
             cursor.execute("DELETE FROM message_logs WHERE chamber_id=?", (chamber_id,))
-            # Delete the chamber
             cursor.execute("DELETE FROM chambers WHERE id=?", (chamber_id,))
             conn.commit()
             db_log_event(email, "DELETE_CHAMBER", f"Deleted chamber: {chamber_name}")
@@ -822,21 +852,39 @@ def render_google_sign_in():
         st.rerun()
 
 # ------------------------------------------------------------------------------
-# SECTION 8: MAIN INTERFACE
+# SECTION 8: SIDEBAR TOGGLE FUNCTIONALITY
+# ------------------------------------------------------------------------------
+
+def toggle_sidebar():
+    """Toggle sidebar state"""
+    if st.session_state.sidebar_state == "expanded":
+        st.session_state.sidebar_state = "collapsed"
+    else:
+        st.session_state.sidebar_state = "expanded"
+
+# ------------------------------------------------------------------------------
+# SECTION 9: MAIN INTERFACE
 # ------------------------------------------------------------------------------
 
 def render_main_interface():
     apply_enhanced_shaders()
     
-    # Theme Toggle Button at the top
-    col1, col2, col3 = st.columns([6, 1, 1])
+    # Top bar with sidebar toggle and theme toggle
+    col1, col2, col3 = st.columns([1, 6, 1])
+    
+    with col1:
+        if st.session_state.sidebar_state == "collapsed":
+            if st.button("☰ Menu", key="sidebar_toggle"):
+                st.session_state.sidebar_state = "expanded"
+                st.rerun()
+    
     with col3:
         if st.session_state.theme_mode == "dark":
-            if st.button("☀️ Light Mode"):
+            if st.button("☀️ Light", key="theme_toggle"):
                 st.session_state.theme_mode = "light"
                 st.rerun()
         else:
-            if st.button("🌙 Dark Mode"):
+            if st.button("🌙 Dark", key="theme_toggle"):
                 st.session_state.theme_mode = "dark"
                 st.rerun()
     
@@ -850,7 +898,7 @@ def render_main_interface():
     # --- SIDEBAR ---
     with st.sidebar:
         st.markdown("<div class='logo-text'>⚖️ ALPHA APEX</div>", unsafe_allow_html=True)
-        st.markdown("<div class='sub-logo-text'>Leviathan Suite v38.0</div>", unsafe_allow_html=True)
+        st.markdown("<div class='sub-logo-text'>Leviathan Suite v38.1</div>", unsafe_allow_html=True)
         
         st.markdown("**Sovereign Navigation Hub**")
         nav_mode = st.radio(
@@ -970,21 +1018,25 @@ def render_main_interface():
                 with st.chat_message(msg["role"]):
                     st.markdown(msg["content"])
         
-        # Input Area
-        input_text = st.chat_input("Enter your legal query for IRAC analysis...")
-        
-        # Voice input positioned next to prompt bar
-        col1, col2 = st.columns([20, 1])
-        with col2:
-            st.markdown('<div class="mic-button-container">', unsafe_allow_html=True)
-            input_voice = speech_to_text(
-                language=lexicon[sys_lang], 
-                start_prompt="🎙️", 
-                stop_prompt="🛑", 
-                key='leviathan_mic', 
-                just_once=True
-            )
-            st.markdown('</div>', unsafe_allow_html=True)
+        # Input Area with Mic Button
+        input_container = st.container()
+        with input_container:
+            # Create a column layout for prompt and mic
+            prompt_col, mic_col = st.columns([20, 1])
+            
+            with prompt_col:
+                input_text = st.chat_input("Enter your legal query for IRAC analysis...")
+            
+            with mic_col:
+                st.markdown('<div class="mic-in-prompt">', unsafe_allow_html=True)
+                input_voice = speech_to_text(
+                    language=lexicon[sys_lang], 
+                    start_prompt="🎙️", 
+                    stop_prompt="🛑", 
+                    key='leviathan_mic', 
+                    just_once=True
+                )
+                st.markdown('</div>', unsafe_allow_html=True)
         
         active_query = input_text or input_voice
         
@@ -1086,13 +1138,13 @@ def render_main_interface():
             st.table(df)
 
 # ------------------------------------------------------------------------------
-# SECTION 9: AUTHENTICATION PORTAL
+# SECTION 10: AUTHENTICATION PORTAL
 # ------------------------------------------------------------------------------
 
 def render_sovereign_portal():
     apply_enhanced_shaders()
     
-    # Theme toggle on login page too
+    # Theme toggle on login page
     col1, col2 = st.columns([6, 1])
     with col2:
         if st.session_state.theme_mode == "dark":
@@ -1145,7 +1197,7 @@ def render_sovereign_portal():
                     st.error("❌ Email already exists or invalid input.")
 
 # ------------------------------------------------------------------------------
-# SECTION 10: MASTER EXECUTION
+# SECTION 11: MASTER EXECUTION
 # ------------------------------------------------------------------------------
 
 if "logged_in" not in st.session_state:
@@ -1161,5 +1213,5 @@ else:
     render_main_interface()
 
 # ==============================================================================
-# END OF ALPHA APEX v38.0 - ALL FEATURES COMPLETE
+# END OF ALPHA APEX v38.1 - UPGRADED VERSION
 # ==============================================================================
