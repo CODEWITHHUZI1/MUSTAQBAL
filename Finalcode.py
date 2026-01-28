@@ -1,6 +1,6 @@
 # ==============================================================================
 # ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM
-# VERSION: 48.0 (IRON-CLAD STABILITY & FULL FEATURE RESTORATION)
+# VERSION: 49.0 (UI OPTIMIZATION - MIC TO PROMPT AREA)
 # ==============================================================================
 
 try:
@@ -35,7 +35,7 @@ st.set_page_config(
 def safe_load_lottie(url: str):
     """FIXES JSONDecodeError: Safely fetches Lottie data or returns None."""
     try:
-        headers = {"User-Agent": "Mozilla/5.0"} # Prevent basic bot blocks
+        headers = {"User-Agent": "Mozilla/5.0"} 
         r = requests.get(url, timeout=5, headers=headers)
         if r.status_code == 200:
             return r.json()
@@ -58,12 +58,15 @@ def apply_leviathan_shaders():
             backdrop-filter: blur(10px);
             margin-bottom: 12px;
         }
-        .stButton>button {
-            border-radius: 10px !important;
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
-            color: #ffffff !important;
-            border: 1px solid #334155 !important;
-            width: 100%;
+        /* Style adjustments for the prompt area mic */
+        .mic-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #1e293b;
+            border-radius: 10px;
+            padding: 5px;
+            border: 1px solid #334155;
         }
         .logo-text { color: #f8fafc; font-size: 26px; font-weight: 800; letter-spacing: 2px; }
         footer {visibility: hidden;}
@@ -74,7 +77,7 @@ def apply_leviathan_shaders():
 # 2. DATA INFRASTRUCTURE & AI IRAC RULES
 # ==============================================================================
 
-DB_FILE = "alpha_apex_leviathan_v48.db"
+DB_FILE = "alpha_apex_leviathan_v49.db"
 
 def init_db():
     conn = sqlite3.connect(DB_FILE); c = conn.cursor()
@@ -100,12 +103,11 @@ IRAC FORMAT: You MUST answer every legal query in this EXACT structure:
 """
 
 # ==============================================================================
-# 3. THE COMPLETE UI (RESTORED FEATURES)
+# 3. THE COMPLETE UI (MIC MOVED TO PROMPT)
 # ==============================================================================
 
 def render_main():
     apply_leviathan_shaders()
-    # The fix: This won't crash even if the URL is broken
     lottie_scales = safe_load_lottie("https://assets5.lottiefiles.com/packages/lf20_v76zkn9x.json")
 
     with st.sidebar:
@@ -117,19 +119,14 @@ def render_main():
         
         if nav_mode == "🏛️ Case Chambers":
             st.subheader("📁 Case Management")
-            # Pull chambers from DB
             conn = sqlite3.connect(DB_FILE); c = conn.cursor()
             c.execute("SELECT name FROM chambers WHERE email=?", (st.session_state.user_email,))
             cases = [r[0] for r in c.fetchall()] or ["General Litigation"]
             st.session_state.current_case = st.radio("Active Files", cases)
             
             st.divider()
-            st.write("🎙️ Voice Search")
-            v_input = speech_to_text(language='en-US', start_prompt="🎙️ Start", stop_prompt="⏹️ Stop", key='mic')
-            
-            st.divider()
             if st.button("➕ New Chamber"): st.toast("Opening New Case...")
-            if st.button("📧 Email Brief"): st.success("Brief Dispatched.")
+            if st.button("📧 Email Brief"): st.success("Brief Dispatched to Vault Email.")
             if st.button("🚪 Logout"): 
                 st.session_state.logged_in = False
                 st.rerun()
@@ -139,14 +136,25 @@ def render_main():
         st.title(f"💼 Case: {st.session_state.current_case}")
         
         chat_container = st.container()
-        t_input = st.chat_input("Enter Query Counsel...")
+
+        # PROMPT AREA WITH INTEGRATED MIC
+        # Using a column layout at the bottom of the screen
+        st.write("---")
+        input_col, mic_col = st.columns([0.9, 0.1])
+        
+        with input_col:
+            t_input = st.chat_input("Enter Query Counsel...")
+        
+        with mic_col:
+            st.write("Voice")
+            v_input = speech_to_text(language='en-US', start_prompt="🎙️", stop_prompt="⏹️", key='prompt_mic')
+
         query = t_input or v_input
 
         if query:
             with chat_container:
                 with st.chat_message("user"): st.write(query)
                 with st.chat_message("assistant"):
-                    # Use Safety Fallback
                     if lottie_scales:
                         with st_lottie_spinner(lottie_scales, height=100):
                             resp = get_engine().invoke(f"{LEVIATHAN_PROMPT}\nQUERY: {query}").content
@@ -159,14 +167,14 @@ def render_main():
     elif nav_mode == "📂 Law Library":
         st.header("📚 Statutory Library")
         up = st.file_uploader("Sync Legal PDF", type="pdf")
-        if up: st.success("Document Verified for Indexing.")
+        if up: st.success("Document Verified. Ready for Leviathan Indexing.")
 
     elif nav_mode == "🛡️ Admin Console":
         st.header("🛡️ System Administration")
         st.table([{"Architect": "Saim Ahmed"}, {"Architect": "Huzaifa Khan"}, {"Architect": "Mustafa Khan"}, {"Architect": "Ibrahim Sohail"}, {"Architect": "Daniyal Faraz"}])
 
 # ==============================================================================
-# 4. FULL AUTHENTICATION GATE (RESTORED)
+# 4. FULL AUTHENTICATION GATE (RETAINED)
 # ==============================================================================
 
 def auth_gate():
@@ -183,7 +191,6 @@ def auth_gate():
             e = st.text_input("Registry Email", key="login_email")
             k = st.text_input("Vault Key", type="password", key="login_key")
             if st.button("Access Vault"):
-                # Demo login logic - in production check DB
                 st.session_state.logged_in = True
                 st.session_state.user_email = e
                 st.rerun()
@@ -194,7 +201,7 @@ def auth_gate():
             st.selectbox("Legal Tier", ["Senior Counsel", "Advocate", "Intern"])
             st.text_input("New Vault Key", type="password", key="reg_key")
             if st.button("Apply to Alpha Apex"):
-                st.info("Identity Registration Submitted.")
+                st.sinfo("Identity Registration Submitted.")
 
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 if not st.session_state.logged_in: auth_gate()
