@@ -116,9 +116,7 @@ function toggleSidebar() {
 }
 </script>
 """
-
-    
-    components.html(sidebar_script, height=0)
+components.html(sidebar_script, height=0)
     
     shader_css = f"""
     <style>
