@@ -54,11 +54,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Initialize theme and sidebar state
+# Initialize theme in session state
 if "theme_mode" not in st.session_state:
     st.session_state.theme_mode = "dark"
-if "sidebar_state" not in st.session_state:
-    st.session_state.sidebar_state = "expanded"
 
 # ------------------------------------------------------------------------------
 # SECTION 3: ENHANCED SHADER WITH LIGHT/DARK MODE + SIDEBAR TOGGLE
@@ -90,6 +88,40 @@ def apply_enhanced_shaders():
         sidebar_bg = "rgba(241, 245, 249, 0.9)"
         chat_bg = "rgba(241, 245, 249, 0.6)"
         prompt_area_bg = "#ffffff"
+    
+    # Add JavaScript for sidebar control
+    sidebar_script = """
+    <script>
+        function toggleSidebar() {
+            const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
+            const collapseBtn = window.parent.document.querySelector('[data-testid="collapsedControl"]');
+            
+            if (sidebar) {
+                if (sidebar.getAttribute('aria-expanded') === 'true') {
+                    // Collapse sidebar
+                    if (collapseBtn) {
+                        collapseBtn.click();
+                    }
+                } else {
+                    // Expand sidebar
+                    if (collapseBtn) {
+                        collapseBtn.click();
+                    }
+                }
+            }
+        }
+        
+        // Auto-click toggle on page load if needed
+        window.addEventListener('load', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('toggle_sidebar') === 'true') {
+                setTimeout(toggleSidebar, 100);
+            }
+        });
+    </script>
+    """
+    
+    components.html(sidebar_script, height=0)
     
     shader_css = f"""
     <style>
@@ -852,31 +884,44 @@ def render_google_sign_in():
         st.rerun()
 
 # ------------------------------------------------------------------------------
-# SECTION 8: SIDEBAR TOGGLE FUNCTIONALITY
-# ------------------------------------------------------------------------------
-
-def toggle_sidebar():
-    """Toggle sidebar state"""
-    if st.session_state.sidebar_state == "expanded":
-        st.session_state.sidebar_state = "collapsed"
-    else:
-        st.session_state.sidebar_state = "expanded"
-
-# ------------------------------------------------------------------------------
 # SECTION 9: MAIN INTERFACE
 # ------------------------------------------------------------------------------
 
 def render_main_interface():
     apply_enhanced_shaders()
     
-    # Top bar with sidebar toggle and theme toggle
-    col1, col2, col3 = st.columns([1, 6, 1])
+    # Add custom sidebar toggle button with JavaScript
+    st.markdown("""
+        <button onclick="toggleSidebar()" style="
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 999999;
+            background: linear-gradient(135deg, #1e293b 0%, #1a1f3a 100%);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            border-radius: 12px;
+            padding: 10px 15px;
+            cursor: pointer;
+            color: #e8edf4;
+            font-weight: 700;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            font-family: 'Crimson Pro', Georgia, serif;
+        ">☰ Menu</button>
+        
+        <script>
+            function toggleSidebar() {
+                const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
+                const collapseBtn = window.parent.document.querySelector('[data-testid="collapsedControl"]');
+                
+                if (collapseBtn) {
+                    collapseBtn.click();
+                }
+            }
+        </script>
+    """, unsafe_allow_html=True)
     
-    with col1:
-        if st.session_state.sidebar_state == "collapsed":
-            if st.button("☰ Menu", key="sidebar_toggle"):
-                st.session_state.sidebar_state = "expanded"
-                st.rerun()
+    # Top bar with theme toggle
+    col1, col2, col3 = st.columns([1, 6, 1])
     
     with col3:
         if st.session_state.theme_mode == "dark":
