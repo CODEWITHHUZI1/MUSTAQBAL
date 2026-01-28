@@ -1,7 +1,6 @@
 # ==============================================================================
 # ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM
-# VERSION: 36.3 (PAKISTAN/SINDH JURISDICTION FIX)
-# ARCHITECTS: SAIM AHMED, HUZAIFA KHAN, MUSTAFA KHAN, IBRAHIM SOHAIL, DANIYAL FARAZ
+# VERSION: 36.4 (INTEGRATED PDF INGESTION)
 # ==============================================================================
 
 try:
@@ -154,6 +153,18 @@ init_leviathan_db()
 def get_analytical_engine():
     return ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"], temperature=0.2)
 
+def extract_pdf_text(uploaded_file):
+    """Helper function to parse PDF content."""
+    try:
+        reader = PdfReader(uploaded_file)
+        text = ""
+        for page in reader.pages:
+            content = page.extract_text()
+            if content: text += content
+        return text, len(reader.pages)
+    except Exception:
+        return None, 0
+
 # ==============================================================================
 # 4. MAIN INTERFACE
 # ==============================================================================
@@ -250,7 +261,6 @@ def render_main_interface():
                     try:
                         active_persona = "Honorable High Court Justice" if judge_mode else custom_persona
                         
-                        # JURISDICTION FIX: EXPLICITLY REJECT NON-PAKISTANI LAW
                         jurisdiction_logic = """
                         JURISDICTIONAL BOUNDARY: You are operating strictly under the Law of PAKISTAN and the Province of SINDH. 
                         NEVER cite Indian Statutes (e.g., Indian Penal Code). 
@@ -288,9 +298,33 @@ def render_main_interface():
 
     elif nav_mode == "Law Library":
         st.header("📚 Law Library Vault")
+        
+        # --- NEW: PDF UPLOADER INTEGRATION ---
+        st.markdown("### 📥 Sync New legal Asset")
+        uploaded_file = st.file_uploader("Upload Pakistani Statute or Case Law (PDF)", type="pdf")
+        
+        if uploaded_file is not None:
+            if st.button("Verify & Sync to Vault"):
+                with st.spinner("Analyzing document structure..."):
+                    text_content, pg_count = extract_pdf_text(uploaded_file)
+                    if text_content:
+                        f_size = uploaded_file.size / 1024 
+                        f_name = uploaded_file.name
+                        ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        
+                        conn = sqlite3.connect(SQL_DB_FILE); cursor = conn.cursor()
+                        cursor.execute('INSERT INTO law_assets (filename, filesize_kb, page_count, sync_timestamp) VALUES (?, ?, ?, ?)', (f_name, round(f_size, 2), pg_count, ts))
+                        conn.commit(); conn.close()
+                        
+                        st.success(f"Asset '{f_name}' verified and synced.")
+                        time.sleep(1); st.rerun()
+                    else:
+                        st.error("Document is unreadable or encrypted.")
+
+        st.write("---")
         st.markdown("### Synchronized Legal Assets")
         conn = sqlite3.connect(SQL_DB_FILE)
-        df_assets = pd.read_sql_query("SELECT filename AS 'File Name', filesize_kb AS 'Size (KB)', sync_timestamp AS 'Sync Date', asset_status AS 'Status' FROM law_assets", conn)
+        df_assets = pd.read_sql_query("SELECT filename AS 'File Name', filesize_kb AS 'Size (KB)', page_count AS 'Pages', sync_timestamp AS 'Sync Date', asset_status AS 'Status' FROM law_assets", conn)
         conn.close()
         if df_assets.empty: st.info("No synchronized PDFs found in local vault.")
         else: st.dataframe(df_assets, use_container_width=True, hide_index=True)
