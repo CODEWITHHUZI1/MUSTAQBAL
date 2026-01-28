@@ -54,9 +54,11 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Initialize theme in session state
+# Initialize theme and sidebar state in session state
 if "theme_mode" not in st.session_state:
     st.session_state.theme_mode = "dark"
+if "sidebar_visible" not in st.session_state:
+    st.session_state.sidebar_visible = True
 
 # ------------------------------------------------------------------------------
 # SECTION 3: ENHANCED SHADER WITH LIGHT/DARK MODE + SIDEBAR TOGGLE
@@ -123,50 +125,42 @@ def apply_enhanced_shaders():
     
     components.html(sidebar_script, height=0)
     
+    # Sidebar visibility control
+    sidebar_visibility = "visible" if st.session_state.sidebar_visible else "hidden"
+    sidebar_transform = "translateX(0)" if st.session_state.sidebar_visible else "translateX(-100%)"
+    
     shader_css = f"""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=Space+Mono:wght@400;700&display=swap');
         
-        /* CRITICAL: Show Streamlit's built-in collapse button */
-        [data-testid="collapsedControl"] {{
-            display: block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
+        /* Sidebar visibility control */
+        [data-testid="stSidebar"] {{
+            visibility: {sidebar_visibility} !important;
+            transform: {sidebar_transform} !important;
+            transition: transform 0.3s ease, visibility 0.3s ease !important;
         }}
         
-        /* Style the collapse arrow button */
-        [data-testid="collapsedControl"] button {{
+        /* Menu Button Styling */
+        .menu-toggle-btn {{
+            position: fixed !important;
+            top: 20px !important;
+            left: 20px !important;
+            z-index: 999999 !important;
             background: linear-gradient(135deg, {bg_tertiary} 0%, {bg_secondary} 100%) !important;
             border: 1px solid {border_color} !important;
-            border-radius: 8px !important;
-            padding: 8px !important;
+            border-radius: 12px !important;
+            padding: 10px 15px !important;
+            cursor: pointer !important;
             color: {text_primary} !important;
+            font-weight: 700 !important;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
+            transition: all 0.3s ease !important;
         }}
         
-        /* Sidebar Toggle Button (Custom) */
-        .sidebar-toggle-btn {{
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            z-index: 999999;
-            background: linear-gradient(135deg, {bg_tertiary} 0%, {bg_secondary} 100%);
-            border: 1px solid {border_color};
-            border-radius: 12px;
-            padding: 10px 15px;
-            cursor: pointer;
-            color: {text_primary};
-            font-weight: 700;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }}
-        
-        .sidebar-toggle-btn:hover {{
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-            border-color: #38bdf8;
+        .menu-toggle-btn:hover {{
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3) !important;
+            border-color: #38bdf8 !important;
         }}
         
         /* Theme Toggle Button */
@@ -211,15 +205,6 @@ def apply_enhanced_shaders():
             backdrop-filter: blur(20px) !important;
             border-right: 1px solid {border_color} !important;
             box-shadow: 12px 0 40px rgba(0, 0, 0, 0.3) !important;
-        }}
-        
-        /* Ensure sidebar is collapsible */
-        [data-testid="stSidebar"][aria-expanded="false"] {{
-            transform: translateX(-100%) !important;
-        }}
-        
-        [data-testid="stSidebar"][aria-expanded="true"] {{
-            transform: translateX(0) !important;
         }}
         
         /* Chat Messages */
@@ -769,7 +754,8 @@ init_leviathan_db()
 
 # ------------------------------------------------------------------------------
 # SECTION 6: AI ENGINE
-# ------------------------------------------------------------------------------ 
+# ------------------------------------------------------------------------------
+
 @st.cache_resource
 def get_analytical_engine():
     try:
@@ -914,72 +900,16 @@ def render_google_sign_in():
 def render_main_interface():
     apply_enhanced_shaders()
     
-    # Sidebar toggle button - place it before columns to ensure it's always visible
-    sidebar_toggle_html = """
-    <div style="position: fixed; top: 20px; left: 20px; z-index: 999999;">
-        <button onclick="toggleSidebar()" style="
-            background: linear-gradient(135deg, #1e293b 0%, #1a1f3a 100%);
-            border: 1px solid rgba(56, 189, 248, 0.2);
-            border-radius: 12px;
-            padding: 10px 15px;
-            cursor: pointer;
-            color: #e8edf4;
-            font-weight: 700;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-            font-family: 'Crimson Pro', Georgia, serif;
-            transition: all 0.3s ease;
-        " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(0, 0, 0, 0.3)';" 
-           onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(0, 0, 0, 0.2)';">
-            ☰ Menu
-        </button>
-    </div>
+    # Menu Toggle Button - Top Left (ALWAYS VISIBLE)
+    menu_col1, menu_col2, menu_col3 = st.columns([1, 5, 1])
     
-    <script>
-        function toggleSidebar() {
-            const parent = window.parent.document;
-            
-            // Try multiple methods to find and click the collapse button
-            let collapseBtn = parent.querySelector('[data-testid="collapsedControl"]');
-            
-            if (!collapseBtn) {
-                // Try alternative selectors
-                collapseBtn = parent.querySelector('button[kind="header"]');
-            }
-            
-            if (!collapseBtn) {
-                // Look for any button in the sidebar area
-                const sidebar = parent.querySelector('[data-testid="stSidebar"]');
-                if (sidebar) {
-                    const buttons = sidebar.querySelectorAll('button');
-                    collapseBtn = buttons[0];
-                }
-            }
-            
-            if (collapseBtn) {
-                collapseBtn.click();
-                console.log('Sidebar toggle clicked');
-            } else {
-                console.log('Could not find collapse button');
-                // Fallback: try to toggle aria-expanded attribute directly
-                const sidebar = parent.querySelector('[data-testid="stSidebar"]');
-                if (sidebar) {
-                    const currentState = sidebar.getAttribute('aria-expanded');
-                    sidebar.setAttribute('aria-expanded', currentState === 'true' ? 'false' : 'true');
-                }
-            }
-        }
-        
-        // Debug: log when script loads
-        console.log('Sidebar toggle script loaded');
-    </script>
-    """
+    with menu_col1:
+        menu_button_text = "✕ Close" if st.session_state.sidebar_visible else "☰ Menu"
+        if st.button(menu_button_text, key="menu_toggle_btn", use_container_width=True):
+            st.session_state.sidebar_visible = not st.session_state.sidebar_visible
+            st.rerun()
     
-    components.html(sidebar_toggle_html, height=0)
-    
-    # Top bar with theme toggle
-    col1, col2, col3 = st.columns([1, 6, 1])
-    
-    with col3:
+    with menu_col3:
         if st.session_state.theme_mode == "dark":
             if st.button("☀️ Light", key="theme_toggle"):
                 st.session_state.theme_mode = "light"
@@ -996,115 +926,122 @@ def render_main_interface():
         "Punjabi": "pa-PK"
     }
 
-    # --- SIDEBAR ---
-    with st.sidebar:
-        st.markdown("<div class='logo-text'>⚖️ ALPHA APEX</div>", unsafe_allow_html=True)
-        st.markdown("<div class='sub-logo-text'>Leviathan Suite v38.1</div>", unsafe_allow_html=True)
-        
-        st.markdown("**Sovereign Navigation Hub**")
-        nav_mode = st.radio(
-            "Navigation", 
-            ["Chambers", "Law Library", "System Admin"], 
-            label_visibility="collapsed"
-        )
-        
-        st.divider()
-        
-        if nav_mode == "Chambers":
-            st.markdown("**Active Case Files**")
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT chamber_name FROM chambers WHERE owner_email=?", (st.session_state.user_email,))
-            user_chambers = [r[0] for r in cursor.fetchall()]
-            conn.close()
+    # --- SIDEBAR (controlled by session state) ---
+    if st.session_state.sidebar_visible:
+        with st.sidebar:
+            st.markdown("<div class='logo-text'>⚖️ ALPHA APEX</div>", unsafe_allow_html=True)
+            st.markdown("<div class='sub-logo-text'>Leviathan Suite v38.1</div>", unsafe_allow_html=True)
             
-            if not user_chambers:
-                user_chambers = ["General Litigation Chamber"]
-                
-            st.session_state.active_ch = st.radio(
-                "Select Case", 
-                user_chambers, 
+            st.markdown("**Sovereign Navigation Hub**")
+            nav_mode = st.radio(
+                "Navigation", 
+                ["Chambers", "Law Library", "System Admin"], 
                 label_visibility="collapsed"
             )
+            st.session_state.nav_mode = nav_mode  # Store for use when sidebar is hidden
             
-            # Action Buttons
-            col_add, col_del = st.columns(2)
-            with col_add:
-                if st.button("➕ New Case"):
-                    st.session_state.show_new_case_modal = True
-            with col_del:
-                if st.button("🗑️ Delete Case"):
-                    if st.session_state.active_ch != "General Litigation Chamber":
-                        st.session_state.show_delete_modal = True
-                    else:
-                        st.warning("Cannot delete default chamber")
+            st.divider()
             
-            # New Case Modal
-            if st.session_state.get('show_new_case_modal', False):
-                new_case_name = st.text_input("Enter New Case Name:", key="new_case_input")
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("Create", key="create_case_btn"):
-                        if new_case_name:
-                            if db_create_new_chamber(st.session_state.user_email, new_case_name):
-                                st.success(f"✓ Created: {new_case_name}")
-                                st.session_state.show_new_case_modal = False
-                                st.session_state.active_ch = new_case_name
+            if nav_mode == "Chambers":
+                st.markdown("**Active Case Files**")
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT chamber_name FROM chambers WHERE owner_email=?", (st.session_state.user_email,))
+                user_chambers = [r[0] for r in cursor.fetchall()]
+                conn.close()
+                
+                if not user_chambers:
+                    user_chambers = ["General Litigation Chamber"]
+                    
+                st.session_state.active_ch = st.radio(
+                    "Select Case", 
+                    user_chambers, 
+                    label_visibility="collapsed"
+                )
+                
+                # Action Buttons
+                col_add, col_del = st.columns(2)
+                with col_add:
+                    if st.button("➕ New Case"):
+                        st.session_state.show_new_case_modal = True
+                with col_del:
+                    if st.button("🗑️ Delete Case"):
+                        if st.session_state.active_ch != "General Litigation Chamber":
+                            st.session_state.show_delete_modal = True
+                        else:
+                            st.warning("Cannot delete default chamber")
+                
+                # New Case Modal
+                if st.session_state.get('show_new_case_modal', False):
+                    new_case_name = st.text_input("Enter New Case Name:", key="new_case_input")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("Create", key="create_case_btn"):
+                            if new_case_name:
+                                if db_create_new_chamber(st.session_state.user_email, new_case_name):
+                                    st.success(f"✓ Created: {new_case_name}")
+                                    st.session_state.show_new_case_modal = False
+                                    st.session_state.active_ch = new_case_name
+                                    time.sleep(1)
+                                    st.rerun()
+                                else:
+                                    st.error("Case already exists or error occurred")
+                    with col2:
+                        if st.button("Cancel", key="cancel_case_btn"):
+                            st.session_state.show_new_case_modal = False
+                            st.rerun()
+                
+                # Delete Case Modal
+                if st.session_state.get('show_delete_modal', False):
+                    st.warning(f"⚠️ Delete '{st.session_state.active_ch}'?")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("Yes, Delete", key="confirm_delete_btn"):
+                            if db_delete_chamber(st.session_state.user_email, st.session_state.active_ch):
+                                st.success("✓ Case Deleted")
+                                st.session_state.active_ch = "General Litigation Chamber"
+                                st.session_state.show_delete_modal = False
                                 time.sleep(1)
                                 st.rerun()
-                            else:
-                                st.error("Case already exists or error occurred")
-                with col2:
-                    if st.button("Cancel", key="cancel_case_btn"):
-                        st.session_state.show_new_case_modal = False
-                        st.rerun()
-            
-            # Delete Case Modal
-            if st.session_state.get('show_delete_modal', False):
-                st.warning(f"⚠️ Delete '{st.session_state.active_ch}'?")
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("Yes, Delete", key="confirm_delete_btn"):
-                        if db_delete_chamber(st.session_state.user_email, st.session_state.active_ch):
-                            st.success("✓ Case Deleted")
-                            st.session_state.active_ch = "General Litigation Chamber"
+                    with col2:
+                        if st.button("Cancel", key="cancel_delete_btn"):
                             st.session_state.show_delete_modal = False
-                            time.sleep(1)
                             st.rerun()
-                with col2:
-                    if st.button("Cancel", key="cancel_delete_btn"):
-                        st.session_state.show_delete_modal = False
-                        st.rerun()
-            
-            st.divider()
-            
-            # Email Brief Button
-            if st.button("📧 Email Brief", use_container_width=True):
-                hist = db_fetch_chamber_history(st.session_state.user_email, st.session_state.active_ch)
-                if hist:
-                    with st.spinner("Sending email..."):
-                        if dispatch_legal_brief(st.session_state.user_email, st.session_state.active_ch, hist):
-                            st.success("✓ Brief sent to your email!")
-                            db_log_event(st.session_state.user_email, "EMAIL_BRIEF", f"Sent brief for {st.session_state.active_ch}")
-                        else:
-                            st.error("Failed to send email")
-                else:
-                    st.warning("No conversation to send")
+                
+                st.divider()
+                
+                # Email Brief Button
+                if st.button("📧 Email Brief", use_container_width=True):
+                    hist = db_fetch_chamber_history(st.session_state.user_email, st.session_state.active_ch)
+                    if hist:
+                        with st.spinner("Sending email..."):
+                            if dispatch_legal_brief(st.session_state.user_email, st.session_state.active_ch, hist):
+                                st.success("✓ Brief sent to your email!")
+                                db_log_event(st.session_state.user_email, "EMAIL_BRIEF", f"Sent brief for {st.session_state.active_ch}")
+                            else:
+                                st.error("Failed to send email")
+                    else:
+                        st.warning("No conversation to send")
 
-        st.divider()
-        
-        with st.expander("⚙️ Advanced Settings"):
-            st.caption("AI Configuration")
-            sys_persona = st.text_input("Assistant Persona", value="Senior High Court Advocate")
-            sys_lang = st.selectbox("Response Language", list(lexicon.keys()))
-            
-            st.caption("Response Format")
-            st.info("📋 IRAC Format Enabled")
-            
             st.divider()
-            if st.button("🚪 Secure Logout", use_container_width=True):
-                st.session_state.logged_in = False
-                st.rerun()
+            
+            with st.expander("⚙️ Advanced Settings"):
+                st.caption("AI Configuration")
+                sys_persona = st.text_input("Assistant Persona", value="Senior High Court Advocate")
+                sys_lang = st.selectbox("Response Language", list(lexicon.keys()))
+                
+                st.caption("Response Format")
+                st.info("📋 IRAC Format Enabled")
+                
+                st.divider()
+                if st.button("🚪 Secure Logout", use_container_width=True):
+                    st.session_state.logged_in = False
+                    st.rerun()
+    else:
+        # Default values when sidebar is hidden
+        nav_mode = st.session_state.get('nav_mode', 'Chambers')
+        sys_persona = "Senior High Court Advocate"
+        sys_lang = "English"
 
     # --- MAIN CONTENT ---
     if nav_mode == "Chambers":
