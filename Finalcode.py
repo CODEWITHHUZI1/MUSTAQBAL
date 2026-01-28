@@ -68,7 +68,7 @@ def apply_enhanced_shaders():
     """Enhanced CSS with light/dark mode support and sidebar toggle"""
     
     # Define color schemes
-    if st.session_state.theme_mode == "dark":
+    if st.session_state.theme_modfe == "dark":
         bg_primary = "#0b1120"
         bg_secondary = "#1a1f3a"
         bg_tertiary = "#1e293b"
@@ -92,36 +92,31 @@ def apply_enhanced_shaders():
         prompt_area_bg = "#ffffff"
     
     # Add JavaScript for sidebar control
-    sidebar_script = """
-    <script>
-        function toggleSidebar() {
-            const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
-            const collapseBtn = window.parent.document.querySelector('[data-testid="collapsedControl"]');
-            
-            if (sidebar) {
-                if (sidebar.getAttribute('aria-expanded') === 'true') {
-                    // Collapse sidebar
-                    if (collapseBtn) {
-                        collapseBtn.click();
-                    }
-                } else {
-                    // Expand sidebar
-                    if (collapseBtn) {
-                        collapseBtn.click();
-                    }
-                }
-            }
-        }
-        
-        // Auto-click toggle on page load if needed
-        window.addEventListener('load', function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('toggle_sidebar') === 'true') {
-                setTimeout(toggleSidebar, 100);
-            }
-        });
-    </script>
-    """
+sidebar_script = """
+<script>
+let sidebarOpen = true;
+
+function toggleSidebar() {
+    const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
+    const main = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
+
+    if (!sidebar) return;
+
+    if (sidebarOpen) {
+        sidebar.style.transform = "translateX(-105%)";
+        sidebar.style.transition = "transform 0.3s ease";
+        if (main) main.style.marginLeft = "0px";
+        sidebarOpen = false;
+    } else {
+        sidebar.style.transform = "translateX(0px)";
+        sidebar.style.transition = "transform 0.3s ease";
+        if (main) main.style.marginLeft = "300px";
+        sidebarOpen = true;
+    }
+}
+</script>
+"""
+
     
     components.html(sidebar_script, height=0)
     
