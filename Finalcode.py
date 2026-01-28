@@ -888,6 +888,12 @@ def render_google_sign_in():
 
 def render_main_interface():
     apply_enhanced_shaders()
+    st.markdown("""
+<div class="menu-toggle-btn" onclick="toggleSidebar()">
+☰ Menu
+</div>
+""", unsafe_allow_html=True)
+
     
     # Top bar with theme toggle only
     col1, col2, col3 = st.columns([1, 5, 1])
