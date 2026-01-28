@@ -1,6 +1,6 @@
 # ==============================================================================
 # ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM
-# VERSION: 36.5 (REGISTRATION RESTORED & UI ENHANCED)
+# VERSION: 36.6 (ADMIN CONSOLE RESTORED & UI STABILITY)
 # ARCHITECTS: SAIM AHMED, HUZAIFA KHAN, MUSTAFA KHAN, IBRAHIM SOHAIL, DANIYAL FARAZ
 # ==============================================================================
 
@@ -21,7 +21,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from streamlit_mic_recorder import speech_to_text
 
 # ==============================================================================
-# 1. PREMIUM HACKATHON SHADER ARCHITECTURE (CSS UPGRADE)
+# 1. PREMIUM HACKATHON SHADER ARCHITECTURE
 # ==============================================================================
 
 st.set_page_config(
@@ -34,50 +34,29 @@ st.set_page_config(
 def apply_leviathan_shaders():
     shader_css = """
     <style>
-        /* GLASSMORPHISM SIDEBAR */
         [data-testid="stSidebar"] {
             background: rgba(2, 6, 23, 0.85) !important;
             backdrop-filter: blur(12px);
             border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
         }
-        
-        /* METRIC CARDS STYLE */
-        [data-testid="stMetricValue"] {
-            font-size: 1.8rem !important;
-            color: #f8fafc !important;
-        }
-        
+        [data-testid="stMetricValue"] { font-size: 1.8rem !important; color: #f8fafc !important; }
         div[data-testid="metric-container"] {
             background: rgba(30, 41, 59, 0.4);
             padding: 15px;
             border-radius: 12px;
             border: 1px solid rgba(255, 255, 255, 0.05);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
-
-        /* CHAT BUBBLE ENHANCEMENTS */
         .stChatMessage {
             background: rgba(30, 41, 59, 0.25) !important;
             border: 1px solid rgba(255, 255, 255, 0.08) !important;
             border-radius: 15px !important;
-            margin-bottom: 1rem !important;
         }
-
-        /* LOGO GRADIENT */
         .logo-text { 
             background: linear-gradient(90deg, #f8fafc, #94a3b8);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             font-size: 28px; font-weight: 800; 
-            letter-spacing: -1px;
         }
-        
-        /* INPUT FIELD OVERRIDE */
-        .stTextInput>div>div>input {
-            background-color: rgba(30, 41, 59, 0.5) !important;
-            color: #ffffff !important;
-        }
-        
         footer {visibility: hidden;}
     </style>
     """
@@ -149,8 +128,7 @@ def render_main_interface():
     
     with st.sidebar:
         st.markdown("<div class='logo-text'>⚖️ ALPHA APEX</div>", unsafe_allow_html=True)
-        st.caption("Strategic Legal Intelligence Suite")
-        nav_mode = st.radio("System Access", ["Chambers", "Law Library", "System Admin"], label_visibility="collapsed")
+        nav_mode = st.radio("Access", ["Chambers", "Law Library", "System Admin"], label_visibility="collapsed")
         
         st.write("---") 
         if nav_mode == "Chambers":
@@ -160,31 +138,28 @@ def render_main_interface():
             chambers_raw = [r[0] for r in cursor.fetchall()]; conn.close()
             chambers_raw = chambers_raw if chambers_raw else ["General Litigation Chamber"]
             st.session_state.current_chamber = st.selectbox("Current File", chambers_raw)
-            if st.button("➕ New Case File"): st.session_state.add_case = True
+            if st.button("➕ New Case"): st.session_state.add_case = True
 
-        st.write("---")
         with st.expander("⚙️ Settings"):
             custom_persona = st.text_input("Persona", value="Senior High Court Advocate")
             lang_choice = st.selectbox("Language", list(lexicon.keys()))
             if st.button("Logout"): st.session_state.logged_in = False; st.rerun()
 
     if nav_mode == "Chambers":
-        # HACKATHON DASHBOARD HEADER
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("System Pulse", "Online", delta="Stable")
-        m2.metric("Legal Engine", "IRAC v2", delta="Active")
-        m3.metric("Jurisdiction", "Sindh/PK", delta="Verified")
-        m4.metric("AI Confidence", "98.4%", delta="Optimal")
+        m1.metric("System Pulse", "Online")
+        m2.metric("Legal Engine", "IRAC v2")
+        m3.metric("Jurisdiction", "Sindh/PK")
+        m4.metric("AI Confidence", "98.4%")
 
         head_col, judge_col, action_col = st.columns([0.6, 0.2, 0.2])
-        with head_col:
-            st.header(f"💼 CASE: {st.session_state.current_chamber}")
-        with judge_col:
-            st.write(" ") 
+        with head_col: st.header(f"💼 CASE: {st.session_state.current_chamber}")
+        with judge_col: 
+            st.write(" ")
             judge_mode = st.toggle("⚖️ JUDGE mode")
         with action_col:
-            st.write(" ") 
-            if st.button("📧 Email Brief"): st.toast("Dispatching...")
+            st.write(" ")
+            if st.button("📧 Email"): st.toast("Dispatching...")
 
         chat_container = st.container()
         with chat_container:
@@ -193,28 +168,23 @@ def render_main_interface():
                 with st.chat_message(msg["role"]): st.write(msg["content"])
 
         prompt_col, mic_col = st.columns([0.9, 0.1])
-        with prompt_col:
-            t_input = st.chat_input("Enter Legal Query...")
+        with prompt_col: t_input = st.chat_input("Enter Legal Query...")
         with mic_col:
-            st.write(" ") 
+            st.write(" ")
             v_input = speech_to_text(language=lexicon[lang_choice], key='v_mic', just_once=True, start_prompt="🎙️", stop_prompt="⏹️")
         
         final_query = t_input or v_input
-
         if final_query:
             db_log_consultation(st.session_state.user_email, st.session_state.current_chamber, "user", final_query)
             with chat_container:
                 with st.chat_message("user"): st.write(final_query)
-            
             with st.chat_message("assistant"):
-                with st.spinner("Analyzing Statutes..."):
+                with st.spinner("Analyzing..."):
                     try:
                         active_persona = "High Court Justice" if judge_mode else custom_persona
-                        jurisdiction_fix = "JURISDICTION: Strict Pakistan/Sindh. NO Indian law. FORMAT: IRAC (Issue, Rule, Application, Conclusion)."
+                        jurisdiction_fix = "JURISDICTION: Strict Pakistan/Sindh. NO Indian law. FORMAT: IRAC."
                         instruction = f"{active_persona}. {jurisdiction_fix}. Query: {final_query}"
-                        
-                        engine = get_analytical_engine()
-                        resp = engine.invoke(instruction).content
+                        resp = get_analytical_engine().invoke(instruction).content
                         st.markdown(resp)
                         db_log_consultation(st.session_state.user_email, st.session_state.current_chamber, "assistant", resp)
                         st.rerun()
@@ -225,12 +195,30 @@ def render_main_interface():
         conn = sqlite3.connect(SQL_DB_FILE)
         df_assets = pd.read_sql_query("SELECT filename, filesize_kb, sync_timestamp, asset_status FROM law_assets", conn)
         conn.close()
-        if df_assets.empty: st.info("No files synced.")
-        else: st.dataframe(df_assets, use_container_width=True)
+        st.dataframe(df_assets, use_container_width=True)
 
     elif nav_mode == "System Admin":
-        st.header("🛡️ Administration")
-        st.info("System operational. Telemetry: Online.")
+        st.header("🛡️ System Administration Console")
+        admin_tab1, admin_tab2, admin_tab3 = st.tabs(["👥 Registered Counsels", "⚖️ Interaction Logs", "🏗️ Project Credits"])
+        with admin_tab1:
+            conn = sqlite3.connect(SQL_DB_FILE)
+            df_users = pd.read_sql_query("SELECT full_name, email, membership_tier, total_queries, registration_date FROM users", conn)
+            st.dataframe(df_users, use_container_width=True)
+            conn.close()
+        with admin_tab2:
+            conn = sqlite3.connect(SQL_DB_FILE)
+            query = "SELECT u.full_name, c.chamber_name, m.sender_role, m.message_body, m.ts_created FROM message_logs m JOIN chambers c ON m.chamber_id = c.id JOIN users u ON c.owner_email = u.email ORDER BY m.id DESC LIMIT 100"
+            df_logs = pd.read_sql_query(query, conn)
+            st.dataframe(df_logs, use_container_width=True)
+            conn.close()
+        with admin_tab3:
+            st.table([
+                {"Architect": "Saim Ahmed", "Focus": "System Architecture"},
+                {"Architect": "Huzaifa Khan", "Focus": "AI Model Tuning"},
+                {"Architect": "Mustafa Khan", "Focus": "SQL Persistence"},
+                {"Architect": "Ibrahim Sohail", "Focus": "UI/UX & Shaders"},
+                {"Architect": "Daniyal Faraz", "Focus": "Quality Assurance"}
+            ])
 
 def render_sovereign_portal():
     apply_leviathan_shaders()
@@ -251,10 +239,8 @@ def render_sovereign_portal():
         n_reg = st.text_input("Counsel Full Name", key="reg_name")
         k_reg = st.text_input("Set Security Key", type="password", key="reg_key")
         if st.button("Initialize Registry"):
-            if db_create_vault_user(e_reg, n_reg, k_reg):
-                st.success("Counsel Registered Successfully")
-            else:
-                st.error("Registry Failed: User may already exist.")
+            if db_create_vault_user(e_reg, n_reg, k_reg): st.success("Counsel Registered")
+            else: st.error("Registry Failed")
 
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 if not st.session_state.logged_in: render_sovereign_portal()
