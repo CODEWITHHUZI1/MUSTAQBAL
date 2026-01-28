@@ -125,20 +125,30 @@ def apply_enhanced_shaders():
     
     components.html(sidebar_script, height=0)
     
-    # Sidebar visibility control
-    sidebar_visibility = "visible" if st.session_state.sidebar_visible else "hidden"
-    sidebar_transform = "translateX(0)" if st.session_state.sidebar_visible else "translateX(-100%)"
+    # Sidebar visibility control - FIX: Show sidebar properly
+    if st.session_state.sidebar_visible:
+        sidebar_css = """
+        [data-testid="stSidebar"] {
+            visibility: visible !important;
+            transform: translateX(0) !important;
+            transition: transform 0.3s ease !important;
+        }
+        """
+    else:
+        sidebar_css = """
+        [data-testid="stSidebar"] {
+            visibility: hidden !important;
+            transform: translateX(-100%) !important;
+            transition: transform 0.3s ease, visibility 0.3s ease !important;
+        }
+        """
     
     shader_css = f"""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=Space+Mono:wght@400;700&display=swap');
         
         /* Sidebar visibility control */
-        [data-testid="stSidebar"] {{
-            visibility: {sidebar_visibility} !important;
-            transform: {sidebar_transform} !important;
-            transition: transform 0.3s ease, visibility 0.3s ease !important;
-        }}
+        {sidebar_css}
         
         /* Menu Button Styling */
         .menu-toggle-btn {{
