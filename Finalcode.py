@@ -1,20 +1,9 @@
 # ==============================================================================
-# ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM - UPGRADED
+# ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM - v38.0
 # ==============================================================================
-# SYSTEM VERSION: 37.0 (ENHANCED UI/UX + IRAC FORMAT + FORMAL RESPONSES)
-# DEPLOYMENT TARGET: STREAMLIT CLOUD / LOCALHOST / ENTERPRISE SERVER
-# DATABASE PERSISTENCE: advocate_ai_v2.db
-# SECURITY PROTOCOL: OAUTH 2.0 FEDERATED IDENTITY + LOCAL VAULT
-#
-# ------------------------------------------------------------------------------
-# UPGRADE FEATURES:
-# - Modern animated typing effects
-# - Enhanced prompt area with auto-resize
-# - IRAC format enforcement for legal queries
-# - Formal greeting/farewell/thank you responses
-# - Legal context filtering
-# - Improved glassmorphism UI
-# ------------------------------------------------------------------------------
+# SYSTEM VERSION: 38.0 (COMPLETE FEATURE SET)
+# ALL FEATURES FUNCTIONAL + LIGHT/DARK MODE + ENHANCED ADMIN PANEL
+# ==============================================================================
 
 try:
     import pysqlite3
@@ -42,7 +31,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 
 # ------------------------------------------------------------------------------
-# SECTION 2: GLOBAL CONFIGURATION & SYSTEM CONSTANTS
+# SECTION 2: GLOBAL CONFIGURATION
 # ------------------------------------------------------------------------------
 
 SYSTEM_CONFIG = {
@@ -52,7 +41,7 @@ SYSTEM_CONFIG = {
     "THEME_PRIMARY": "#0b1120",
     "DB_FILENAME": "advocate_ai_v2.db",
     "DATA_REPOSITORY": "data",
-    "VERSION_ID": "37.0.0-UPGRADED",
+    "VERSION_ID": "38.0.0-COMPLETE",
     "LOG_LEVEL": "STRICT",
     "SMTP_SERVER": "smtp.gmail.com",
     "SMTP_PORT": 587
@@ -65,351 +54,262 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Initialize theme in session state
+if "theme_mode" not in st.session_state:
+    st.session_state.theme_mode = "dark"
+
 # ------------------------------------------------------------------------------
-# SECTION 3: ENHANCED SHADER ARCHITECTURE WITH ANIMATIONS
+# SECTION 3: ENHANCED SHADER WITH LIGHT/DARK MODE
 # ------------------------------------------------------------------------------
 
 def apply_enhanced_shaders():
-    """
-    Enhanced CSS with modern animations, better typography, and improved UX
-    """
-    shader_css = """
+    """Enhanced CSS with light/dark mode support"""
+    
+    # Define color schemes
+    if st.session_state.theme_mode == "dark":
+        bg_primary = "#0b1120"
+        bg_secondary = "#1a1f3a"
+        bg_tertiary = "#1e293b"
+        text_primary = "#e8edf4"  # Lighter text
+        text_secondary = "#b4bdd0"  # Lighter secondary text
+        border_color = "rgba(56, 189, 248, 0.2)"
+        input_bg = "rgba(30, 41, 59, 0.6)"
+        sidebar_bg = "rgba(2, 6, 23, 0.8)"
+        chat_bg = "rgba(30, 41, 59, 0.4)"
+        prompt_area_bg = "#0a0f1a"  # Black background for prompt area
+    else:
+        bg_primary = "#f8fafc"
+        bg_secondary = "#e2e8f0"
+        bg_tertiary = "#cbd5e1"
+        text_primary = "#0f172a"
+        text_secondary = "#475569"
+        border_color = "rgba(14, 165, 233, 0.3)"
+        input_bg = "rgba(255, 255, 255, 0.9)"
+        sidebar_bg = "rgba(241, 245, 249, 0.9)"
+        chat_bg = "rgba(241, 245, 249, 0.6)"
+        prompt_area_bg = "#ffffff"
+    
+    shader_css = f"""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=Space+Mono:wght@400;700&display=swap');
         
-        /* ------------------------------------------------------- */
-        /* 1. GLOBAL RESET & BASE STYLING WITH ANIMATIONS         */
-        /* ------------------------------------------------------- */
-        * { 
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important; 
+        /* Theme Toggle Button */
+        .theme-toggle {{
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 999999;
+            background: linear-gradient(135deg, {bg_tertiary} 0%, {bg_secondary} 100%);
+            border: 1px solid {border_color};
+            border-radius: 25px;
+            padding: 8px 18px;
+            cursor: pointer;
+            color: {text_primary};
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }}
+        
+        .theme-toggle:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }}
+        
+        /* Global Styles */
+        * {{ 
+            transition: background-color 0.3s ease, color 0.3s ease !important; 
             font-family: 'Crimson Pro', Georgia, serif;
             -webkit-font-smoothing: antialiased;
-        }
+        }}
         
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        
-        @keyframes shimmer {
-            0% { background-position: -1000px 0; }
-            100% { background-position: 1000px 0; }
-        }
-        
-        /* ------------------------------------------------------- */
-        /* 2. MAIN APPLICATION CANVAS WITH GRADIENT                */
-        /* ------------------------------------------------------- */
-        .stApp { 
-            background: linear-gradient(135deg, #0b1120 0%, #1a1f3a 50%, #0b1120 100%) !important;
+        /* Main Application */
+        .stApp {{ 
+            background: linear-gradient(135deg, {bg_primary} 0%, {bg_secondary} 50%, {bg_primary} 100%) !important;
             background-size: 200% 200% !important;
-            animation: gradientShift 15s ease infinite;
-            color: #e2e8f0 !important; 
-        }
+            color: {text_primary} !important; 
+        }}
         
-        @keyframes gradientShift {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-
-        /* ------------------------------------------------------- */
-        /* 3. ENHANCED SIDEBAR WITH GLASSMORPHISM                  */
-        /* ------------------------------------------------------- */
-        [data-testid="stSidebar"] {
-            background: rgba(2, 6, 23, 0.8) !important; 
+        /* Sidebar */
+        [data-testid="stSidebar"] {{
+            background: {sidebar_bg} !important; 
             backdrop-filter: blur(20px) !important;
-            border-right: 1px solid rgba(56, 189, 248, 0.1) !important;
-            box-shadow: 12px 0 40px rgba(0, 0, 0, 0.5) !important;
-        }
+            border-right: 1px solid {border_color} !important;
+            box-shadow: 12px 0 40px rgba(0, 0, 0, 0.3) !important;
+        }}
         
-        [data-testid="stSidebarNav"] {
-            padding-top: 2rem !important;
-        }
-
-        /* ------------------------------------------------------- */
-        /* 4. ENHANCED CHAT MESSAGES WITH ANIMATIONS               */
-        /* ------------------------------------------------------- */
-        .stChatMessage {
-            animation: fadeInUp 0.5s ease-out !important;
+        /* Chat Messages */
+        .stChatMessage {{
             border-radius: 16px !important;
             padding: 2rem !important;
             margin-bottom: 2rem !important;
-            border: 1px solid rgba(56, 189, 248, 0.15) !important;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2) !important;
-            background: linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.4) 100%) !important;
+            border: 1px solid {border_color} !important;
+            background: {chat_bg} !important;
             backdrop-filter: blur(10px) !important;
-        }
-
-        .stChatMessage:hover {
-            transform: translateX(5px) !important;
-            border-color: rgba(56, 189, 248, 0.3) !important;
-            box-shadow: 0 15px 40px rgba(56, 189, 248, 0.1) !important;
-        }
-
-        /* User Message Styling */
-        [data-testid="stChatMessageUser"] {
+        }}
+        
+        [data-testid="stChatMessageUser"] {{
             border-left: 4px solid #38bdf8 !important;
-            background: linear-gradient(135deg, rgba(56, 189, 248, 0.1) 0%, rgba(14, 165, 233, 0.05) 100%) !important;
-        }
+        }}
         
-        /* Assistant Message Styling */
-        [data-testid="stChatMessageAssistant"] {
+        [data-testid="stChatMessageAssistant"] {{
             border-left: 4px solid #ef4444 !important;
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(185, 28, 28, 0.05) 100%) !important;
-        }
-
-        /* ------------------------------------------------------- */
-        /* 5. ENHANCED TYPOGRAPHY WITH LEGAL AESTHETIC             */
-        /* ------------------------------------------------------- */
-        h1, h2, h3, h4 { 
-            color: #f8fafc !important; 
-            font-weight: 700 !important; 
-            letter-spacing: -0.02em !important;
-            font-family: 'Crimson Pro', Georgia, serif !important;
-        }
+        }}
         
-        .logo-text {
-            color: #f8fafc;
+        /* Typography */
+        h1, h2, h3, h4 {{ 
+            color: {text_primary} !important; 
+            font-weight: 700 !important; 
+        }}
+        
+        p, span, div {{
+            color: {text_primary} !important;
+        }}
+        
+        .logo-text {{
+            color: {text_primary};
             font-size: 32px;
             font-weight: 900;
             text-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
-            margin-bottom: 2px;
             font-family: 'Space Mono', monospace !important;
-            letter-spacing: 2px;
-        }
+        }}
         
-        .sub-logo-text {
-            color: #94a3b8;
+        .sub-logo-text {{
+            color: {text_secondary};
             font-size: 11px;
-            margin-top: -8px;
-            margin-bottom: 25px;
             text-transform: uppercase;
             letter-spacing: 3px;
-            font-weight: 700;
             font-family: 'Space Mono', monospace !important;
-        }
-
-        /* ------------------------------------------------------- */
-        /* 6. ENHANCED BUTTON ARCHITECTURE                         */
-        /* ------------------------------------------------------- */
-        .stButton>button {
+        }}
+        
+        /* Buttons */
+        .stButton>button {{
             border-radius: 12px !important;
             font-weight: 700 !important;
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
-            color: #f1f5f9 !important;
-            border: 1px solid rgba(56, 189, 248, 0.3) !important;
+            background: {bg_tertiary} !important;
+            color: {text_primary} !important;
+            border: 1px solid {border_color} !important;
             height: 3.5rem !important;
             width: 100% !important;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
-            position: relative !important;
-            overflow: hidden !important;
-        }
+        }}
         
-        .stButton>button::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.3), transparent);
-            transition: left 0.5s;
-        }
-        
-        .stButton>button:hover::before {
-            left: 100%;
-        }
-        
-        .stButton>button:hover {
-            background: linear-gradient(135deg, #334155 0%, #1e293b 100%) !important;
+        .stButton>button:hover {{
             border-color: #38bdf8 !important;
-            box-shadow: 0 0 30px rgba(56, 189, 248, 0.4) !important;
-            transform: translateY(-3px) !important;
-        }
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.3) !important;
+        }}
         
-        .stButton>button:active {
-            transform: translateY(-1px) scale(0.98) !important;
-        }
-
-        /* ------------------------------------------------------- */
-        /* 7. ENHANCED INPUT FIELDS                                */
-        /* ------------------------------------------------------- */
+        /* Input Fields */
         .stTextInput>div>div>input,
-        .stTextArea>div>div>textarea {
-            background: rgba(30, 41, 59, 0.6) !important;
-            color: #f8fafc !important;
-            border: 1px solid rgba(56, 189, 248, 0.2) !important;
+        .stTextArea>div>div>textarea {{
+            background: {input_bg} !important;
+            color: {text_primary} !important;
+            border: 1px solid {border_color} !important;
             border-radius: 12px !important;
             padding: 14px 18px !important;
-            backdrop-filter: blur(10px) !important;
-            font-family: 'Crimson Pro', Georgia, serif !important;
-        }
+        }}
         
         .stTextInput>div>div>input:focus,
-        .stTextArea>div>div>textarea:focus {
+        .stTextArea>div>div>textarea:focus {{
             border-color: #38bdf8 !important;
             box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2) !important;
-            background: rgba(30, 41, 59, 0.8) !important;
-        }
-
-        /* ------------------------------------------------------- */
-        /* 8. CHAT INPUT ENHANCEMENTS                              */
-        /* ------------------------------------------------------- */
-        .stChatInputContainer {
-            padding-right: 60px !important;
-            background: rgba(15, 23, 42, 0.8) !important;
-            backdrop-filter: blur(10px) !important;
-            border-top: 1px solid rgba(56, 189, 248, 0.1) !important;
-        }
+        }}
         
-        .stChatInput>div>div>textarea {
-            background: rgba(30, 41, 59, 0.6) !important;
-            color: #f8fafc !important;
-            border: 1px solid rgba(56, 189, 248, 0.2) !important;
+        /* Chat Input Container - BLACK BACKGROUND */
+        .stChatInputContainer {{
+            background: {prompt_area_bg} !important;
+            backdrop-filter: blur(10px) !important;
+            border-top: 1px solid {border_color} !important;
+            padding: 20px !important;
+        }}
+        
+        /* Chat Input Field */
+        .stChatInput>div>div>textarea {{
+            background: {input_bg} !important;
+            color: {text_primary} !important;
+            border: 1px solid {border_color} !important;
             border-radius: 12px !important;
             padding: 14px 18px !important;
+            padding-right: 60px !important;
             min-height: 60px !important;
             font-size: 15px !important;
-            line-height: 1.6 !important;
-            font-family: 'Crimson Pro', Georgia, serif !important;
-        }
+        }}
         
-        .stChatInput>div>div>textarea:focus {
-            border-color: #38bdf8 !important;
-            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2) !important;
-            background: rgba(30, 41, 59, 0.8) !important;
-        }
-
-        /* ------------------------------------------------------- */
-        /* 9. LOADING ANIMATION                                    */
-        /* ------------------------------------------------------- */
-        .stSpinner > div {
-            border-color: #38bdf8 !important;
-            border-top-color: transparent !important;
-        }
-
-        /* ------------------------------------------------------- */
-        /* 10. RADIO BUTTONS WITH RED ACCENT                       */
-        /* ------------------------------------------------------- */
-        .stRadio > div[role="radiogroup"] > label > div:first-child {
-            background-color: #ef4444 !important; 
-            border-color: #ef4444 !important;
-            box-shadow: 0 0 15px rgba(239, 68, 68, 0.4) !important;
-        }
+        /* Microphone Button - NEXT TO PROMPT BAR */
+        .stChatInput {{
+            position: relative !important;
+        }}
         
-        .stRadio > div[role="radiogroup"] {
-            gap: 16px;
-            padding: 14px 0px;
-        }
+        .mic-button-container {{
+            position: absolute !important;
+            right: 15px !important;
+            bottom: 15px !important;
+            z-index: 100 !important;
+        }}
         
-        .stRadio label {
-            color: #cbd5e1 !important;
-            font-weight: 600 !important;
-            font-size: 15px !important;
-            font-family: 'Crimson Pro', Georgia, serif !important;
-        }
-
-        /* ------------------------------------------------------- */
-        /* 11. MICROPHONE CONTAINER                                */
-        /* ------------------------------------------------------- */
-        .mic-container { 
-            position: fixed; 
-            bottom: 38px; 
-            right: 4.5%; 
-            z-index: 999999; 
-        }
-        
-        .mic-container button { 
+        .mic-button-container button {{
             background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important; 
             border: none !important; 
-            font-size: 22px !important; 
-            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4) !important;
             border-radius: 50% !important;
-            width: 50px !important;
-            height: 50px !important;
+            width: 45px !important;
+            height: 45px !important;
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
-        }
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4) !important;
+            cursor: pointer !important;
+        }}
         
-        .mic-container button:hover {
+        .mic-button-container button:hover {{
             transform: scale(1.1) !important;
-            box-shadow: 0 6px 30px rgba(239, 68, 68, 0.6) !important;
-        }
-
-        /* ------------------------------------------------------- */
-        /* 12. ENHANCED METRICS & INFO BOXES                       */
-        /* ------------------------------------------------------- */
-        [data-testid="stMetricValue"] {
-            font-size: 2rem !important;
+            box-shadow: 0 6px 25px rgba(239, 68, 68, 0.6) !important;
+        }}
+        
+        /* Radio Buttons */
+        .stRadio > div[role="radiogroup"] > label > div:first-child {{
+            background-color: #ef4444 !important; 
+            border-color: #ef4444 !important;
+        }}
+        
+        .stRadio label {{
+            color: {text_secondary} !important;
+            font-weight: 600 !important;
+        }}
+        
+        /* Tables */
+        .stTable {{
+            color: {text_primary} !important;
+        }}
+        
+        table {{
+            color: {text_primary} !important;
+        }}
+        
+        thead tr th {{
+            background-color: {bg_tertiary} !important;
+            color: {text_primary} !important;
+        }}
+        
+        tbody tr td {{
+            color: {text_primary} !important;
+        }}
+        
+        /* Metrics */
+        [data-testid="stMetricValue"] {{
             color: #38bdf8 !important;
             font-weight: 700 !important;
-            font-family: 'Space Mono', monospace !important;
-        }
+        }}
         
-        .stAlert {
-            border-radius: 12px !important;
-            border: 1px solid rgba(56, 189, 248, 0.2) !important;
-            background: rgba(30, 41, 59, 0.4) !important;
-            backdrop-filter: blur(10px) !important;
-        }
-
-        /* ------------------------------------------------------- */
-        /* 13. SCROLLBAR STYLING                                   */
-        /* ------------------------------------------------------- */
-        ::-webkit-scrollbar { width: 12px; height: 12px; }
-        ::-webkit-scrollbar-track { background: #020617; }
-        ::-webkit-scrollbar-thumb { 
-            background: linear-gradient(135deg, #1e293b, #334155); 
+        /* Scrollbar */
+        ::-webkit-scrollbar {{ width: 12px; }}
+        ::-webkit-scrollbar-track {{ background: {bg_primary}; }}
+        ::-webkit-scrollbar-thumb {{ 
+            background: {bg_tertiary}; 
             border-radius: 6px; 
-        }
-        ::-webkit-scrollbar-thumb:hover { background: #334155; }
-
-        /* ------------------------------------------------------- */
-        /* 14. GOOGLE OAUTH BUTTON                                 */
-        /* ------------------------------------------------------- */
-        .google-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-            color: #0f172a;
-            font-weight: 700;
-            padding: 1rem;
-            border-radius: 12px;
-            cursor: pointer;
-            border: 1px solid #e2e8f0;
-            text-decoration: none !important;
-            transition: all 0.3s ease;
-            margin-top: 20px;
-            width: 100%;
-            font-size: 1rem;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-
-        .google-btn:hover {
-            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            transform: translateY(-3px);
-        }
-
-        /* ------------------------------------------------------- */
-        /* 15. HIDE STREAMLIT BRANDING                             */
-        /* ------------------------------------------------------- */
-        footer {visibility: hidden;}
-        #MainMenu {visibility: hidden;}
-        header {visibility: hidden;}
+        }}
+        
+        /* Hide Streamlit branding */
+        footer {{visibility: hidden;}}
+        #MainMenu {{visibility: hidden;}}
+        header {{visibility: hidden;}}
     </style>
     """
     st.markdown(shader_css, unsafe_allow_html=True)
@@ -419,27 +319,23 @@ def apply_enhanced_shaders():
 # ------------------------------------------------------------------------------
 
 def is_greeting(text):
-    """Detect if the input is a greeting"""
     greetings = ['hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening', 
                  'greetings', 'salaam', 'assalam', 'salam']
     text_lower = text.lower().strip()
     return any(greet in text_lower for greet in greetings)
 
 def is_farewell(text):
-    """Detect if the input is a farewell"""
     farewells = ['bye', 'goodbye', 'see you', 'farewell', 'take care', 'allah hafiz', 
                  'khuda hafiz', 'bye bye']
     text_lower = text.lower().strip()
     return any(fare in text_lower for fare in farewells)
 
 def is_thank_you(text):
-    """Detect if the input is a thank you message"""
     thanks = ['thank', 'thanks', 'appreciate', 'grateful', 'shukriya', 'meherbani']
     text_lower = text.lower().strip()
     return any(thank in text_lower for thank in thanks)
 
 def is_legal_context(text):
-    """Check if the query is within legal context"""
     legal_keywords = [
         'law', 'legal', 'court', 'case', 'judge', 'lawyer', 'attorney', 'contract', 
         'crime', 'criminal', 'civil', 'litigation', 'jurisdiction', 'statute', 'ordinance',
@@ -454,13 +350,11 @@ def is_legal_context(text):
     return any(keyword in text_lower for keyword in legal_keywords) or len(text) > 100
 
 def get_formal_greeting():
-    """Return a formal greeting response"""
     return """Good day. I am Alpha Apex, your dedicated legal intelligence advisor. 
 
 I am here to assist you with legal queries, case analysis, and strategic litigation guidance. How may I be of service to you today?"""
 
 def get_formal_farewell():
-    """Return a formal farewell response"""
     return """Thank you for consulting with Alpha Apex Legal Intelligence. 
 
 Should you require further legal assistance or strategic counsel, I remain at your service. Wishing you success in your legal endeavors.
@@ -469,7 +363,6 @@ Best regards,
 Alpha Apex AI"""
 
 def get_formal_thanks():
-    """Return a formal acknowledgment for thanks"""
     return """You are most welcome. It is my privilege to assist you with your legal matters.
 
 Should you have any further questions or require additional analysis, please do not hesitate to reach out.
@@ -478,7 +371,6 @@ At your service,
 Alpha Apex AI"""
 
 def get_non_legal_response():
-    """Return a polite refusal for non-legal queries"""
     return """I appreciate your inquiry, however, my specialized domain is limited to legal matters and jurisprudence.
 
 I am designed to assist with:
@@ -492,41 +384,8 @@ For matters outside the legal domain, I kindly recommend consulting with appropr
 
 Is there a legal matter I may assist you with today?"""
 
-def format_irac_response(user_query, ai_response):
-    """Format the AI response in IRAC (Issue, Rule, Application, Conclusion) format"""
-    
-    # Check if response is already in IRAC format
-    if all(keyword in ai_response.upper() for keyword in ['ISSUE', 'RULE', 'APPLICATION', 'CONCLUSION']):
-        return ai_response
-    
-    # Otherwise, structure the response in IRAC format
-    irac_prompt = f"""
-Please analyze the following legal query using the IRAC format (Issue, Rule, Application, Conclusion):
-
-Query: {user_query}
-
-Provide your analysis in the following structure:
-
-**ISSUE:**
-[Clearly identify the legal issue or question presented]
-
-**RULE:**
-[State the relevant legal rules, statutes, or precedents that apply]
-
-**APPLICATION:**
-[Apply the legal rules to the specific facts of this case/query]
-
-**CONCLUSION:**
-[Provide a clear conclusion based on the analysis]
-
-Your Response: {ai_response}
-
-Now reformat this into proper IRAC structure.
-"""
-    return irac_prompt
-
 # ------------------------------------------------------------------------------
-# SECTION 5: DATABASE FUNCTIONS (SAME AS ORIGINAL)
+# SECTION 5: DATABASE FUNCTIONS
 # ------------------------------------------------------------------------------
 
 def get_db_connection():
@@ -703,10 +562,126 @@ def db_fetch_chamber_history(email, chamber_name):
             
     return history
 
+def db_create_new_chamber(email, chamber_name):
+    """Create a new case/chamber"""
+    conn = get_db_connection()
+    if not conn:
+        return False
+    
+    try:
+        cursor = conn.cursor()
+        # Check if chamber already exists
+        cursor.execute("SELECT id FROM chambers WHERE owner_email=? AND chamber_name=?", (email, chamber_name))
+        if cursor.fetchone():
+            return False
+        
+        ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute('''
+            INSERT INTO chambers (owner_email, chamber_name, init_date) 
+            VALUES (?, ?, ?)
+        ''', (email, chamber_name, ts))
+        conn.commit()
+        db_log_event(email, "NEW_CHAMBER", f"Created new chamber: {chamber_name}")
+        return True
+    except Exception as e:
+        st.error(f"Chamber Creation Error: {e}")
+        return False
+    finally:
+        conn.close()
+
+def db_delete_chamber(email, chamber_name):
+    """Delete a chamber and all its messages"""
+    conn = get_db_connection()
+    if not conn:
+        return False
+    
+    try:
+        cursor = conn.cursor()
+        # Get chamber ID
+        cursor.execute("SELECT id FROM chambers WHERE owner_email=? AND chamber_name=?", (email, chamber_name))
+        result = cursor.fetchone()
+        
+        if result:
+            chamber_id = result[0]
+            # Delete all messages in this chamber
+            cursor.execute("DELETE FROM message_logs WHERE chamber_id=?", (chamber_id,))
+            # Delete the chamber
+            cursor.execute("DELETE FROM chambers WHERE id=?", (chamber_id,))
+            conn.commit()
+            db_log_event(email, "DELETE_CHAMBER", f"Deleted chamber: {chamber_name}")
+            return True
+        return False
+    except Exception as e:
+        st.error(f"Chamber Deletion Error: {e}")
+        return False
+    finally:
+        conn.close()
+
+def db_get_all_counsels():
+    """Get all registered counsels"""
+    conn = get_db_connection()
+    counsels = []
+    
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT full_name, email, registration_date, last_login, total_queries, provider 
+                FROM users 
+                ORDER BY registration_date DESC
+            ''')
+            rows = cursor.fetchall()
+            
+            for r in rows:
+                counsels.append({
+                    "Name": r[0],
+                    "Email": r[1],
+                    "Registered": r[2],
+                    "Last Login": r[3] if r[3] else "Never",
+                    "Total Queries": r[4],
+                    "Provider": r[5]
+                })
+        except sqlite3.Error as e:
+            st.error(f"Counsel Retrieval Error: {e}")
+        finally:
+            conn.close()
+            
+    return counsels
+
+def db_get_interaction_logs(limit=100):
+    """Get recent interaction logs"""
+    conn = get_db_connection()
+    logs = []
+    
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT user_email, event_type, description, event_timestamp 
+                FROM system_telemetry 
+                ORDER BY event_id DESC 
+                LIMIT ?
+            ''', (limit,))
+            rows = cursor.fetchall()
+            
+            for r in rows:
+                logs.append({
+                    "User": r[0],
+                    "Event": r[1],
+                    "Description": r[2],
+                    "Timestamp": r[3]
+                })
+        except sqlite3.Error as e:
+            st.error(f"Log Retrieval Error: {e}")
+        finally:
+            conn.close()
+            
+    return logs
+
 init_leviathan_db()
 
 # ------------------------------------------------------------------------------
-# SECTION 6: AI ENGINE WITH ENHANCED PROMPTING
+# SECTION 6: AI ENGINE
 # ------------------------------------------------------------------------------
 
 @st.cache_resource
@@ -723,11 +698,8 @@ def get_analytical_engine():
         return None
 
 def get_enhanced_legal_response(engine, user_query, sys_persona, sys_lang):
-    """
-    Generate AI response with IRAC format enforcement and legal context checking
-    """
+    """Generate AI response with IRAC format"""
     
-    # Check for greetings, farewells, and thanks first
     if is_greeting(user_query):
         return get_formal_greeting()
     
@@ -737,11 +709,9 @@ def get_enhanced_legal_response(engine, user_query, sys_persona, sys_lang):
     if is_thank_you(user_query):
         return get_formal_thanks()
     
-    # Check if query is in legal context
     if not is_legal_context(user_query):
         return get_non_legal_response()
     
-    # Construct IRAC-enforced prompt
     enhanced_prompt = f"""
 You are {sys_persona}, a distinguished legal expert providing formal legal analysis.
 
@@ -778,6 +748,7 @@ Provide your analysis now:
         return f"Error generating legal analysis: {str(e)}"
 
 def dispatch_legal_brief(target_email, chamber_name, history_data):
+    """Send full conversation via email"""
     try:
         sender_user = st.secrets["EMAIL_USER"]
         sender_pass = st.secrets["EMAIL_PASS"].replace(" ", "")
@@ -787,15 +758,24 @@ def dispatch_legal_brief(target_email, chamber_name, history_data):
         msg['To'] = target_email
         msg['Subject'] = f"LEGAL BRIEF: {chamber_name} - {datetime.date.today()}"
         
-        body = f"--- ALPHA APEX LEGAL INTELLIGENCE BRIEF ---\n"
+        body = f"=" * 70 + "\n"
+        body += "ALPHA APEX LEGAL INTELLIGENCE BRIEF\n"
+        body += "=" * 70 + "\n\n"
         body += f"CHAMBER: {chamber_name}\n"
+        body += f"DATE: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         body += f"STATUS: CONFIDENTIAL PRIVILEGED\n\n"
+        body += "=" * 70 + "\n\n"
         
-        for entry in history_data:
-            role_label = "COUNSEL" if entry['role'] == 'user' else "AI ADVISOR"
-            body += f"[{role_label}]:\n{entry['content']}\n\n"
+        for idx, entry in enumerate(history_data, 1):
+            role_label = "COUNSEL" if entry['role'] == 'user' else "AI LEGAL ADVISOR"
+            body += f"[MESSAGE {idx} - {role_label}]\n"
+            body += "-" * 70 + "\n"
+            body += f"{entry['content']}\n\n"
             
-        body += "\n--- END OF BRIEF ---\nGenerated by Leviathan v37.0"
+        body += "=" * 70 + "\n"
+        body += "END OF LEGAL BRIEF\n"
+        body += f"Generated by Alpha Apex Leviathan v{SYSTEM_CONFIG['VERSION_ID']}\n"
+        body += "=" * 70 + "\n"
         
         msg.attach(MIMEText(body, 'plain', 'utf-8'))
         
@@ -806,7 +786,7 @@ def dispatch_legal_brief(target_email, chamber_name, history_data):
         server.quit()
         return True
     except Exception as smtp_err:
-        st.error(f"SMTP Dispatch Failure: {smtp_err}")
+        st.error(f"📧 Email Dispatch Failure: {smtp_err}")
         return False
 
 # ------------------------------------------------------------------------------
@@ -842,11 +822,23 @@ def render_google_sign_in():
         st.rerun()
 
 # ------------------------------------------------------------------------------
-# SECTION 8: MAIN INTERFACE WITH ENHANCED UX
+# SECTION 8: MAIN INTERFACE
 # ------------------------------------------------------------------------------
 
 def render_main_interface():
     apply_enhanced_shaders()
+    
+    # Theme Toggle Button at the top
+    col1, col2, col3 = st.columns([6, 1, 1])
+    with col3:
+        if st.session_state.theme_mode == "dark":
+            if st.button("☀️ Light Mode"):
+                st.session_state.theme_mode = "light"
+                st.rerun()
+        else:
+            if st.button("🌙 Dark Mode"):
+                st.session_state.theme_mode = "dark"
+                st.rerun()
     
     lexicon = {
         "English": "en-US", 
@@ -858,7 +850,7 @@ def render_main_interface():
     # --- SIDEBAR ---
     with st.sidebar:
         st.markdown("<div class='logo-text'>⚖️ ALPHA APEX</div>", unsafe_allow_html=True)
-        st.markdown("<div class='sub-logo-text'>Leviathan Suite v37.0 Enhanced</div>", unsafe_allow_html=True)
+        st.markdown("<div class='sub-logo-text'>Leviathan Suite v38.0</div>", unsafe_allow_html=True)
         
         st.markdown("**Sovereign Navigation Hub**")
         nav_mode = st.radio(
@@ -886,14 +878,69 @@ def render_main_interface():
                 label_visibility="collapsed"
             )
             
-            col_add, col_mail = st.columns(2)
+            # Action Buttons
+            col_add, col_del = st.columns(2)
             with col_add:
-                if st.button("➕ New"): st.session_state.trigger_new_ch = True
-            with col_mail:
-                if st.button("📧 Brief"):
-                    hist = db_fetch_chamber_history(st.session_state.user_email, st.session_state.active_ch)
-                    if dispatch_legal_brief(st.session_state.user_email, st.session_state.active_ch, hist):
-                        st.success("✓ Brief Dispatched Successfully")
+                if st.button("➕ New Case"):
+                    st.session_state.show_new_case_modal = True
+            with col_del:
+                if st.button("🗑️ Delete Case"):
+                    if st.session_state.active_ch != "General Litigation Chamber":
+                        st.session_state.show_delete_modal = True
+                    else:
+                        st.warning("Cannot delete default chamber")
+            
+            # New Case Modal
+            if st.session_state.get('show_new_case_modal', False):
+                new_case_name = st.text_input("Enter New Case Name:", key="new_case_input")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("Create", key="create_case_btn"):
+                        if new_case_name:
+                            if db_create_new_chamber(st.session_state.user_email, new_case_name):
+                                st.success(f"✓ Created: {new_case_name}")
+                                st.session_state.show_new_case_modal = False
+                                st.session_state.active_ch = new_case_name
+                                time.sleep(1)
+                                st.rerun()
+                            else:
+                                st.error("Case already exists or error occurred")
+                with col2:
+                    if st.button("Cancel", key="cancel_case_btn"):
+                        st.session_state.show_new_case_modal = False
+                        st.rerun()
+            
+            # Delete Case Modal
+            if st.session_state.get('show_delete_modal', False):
+                st.warning(f"⚠️ Delete '{st.session_state.active_ch}'?")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("Yes, Delete", key="confirm_delete_btn"):
+                        if db_delete_chamber(st.session_state.user_email, st.session_state.active_ch):
+                            st.success("✓ Case Deleted")
+                            st.session_state.active_ch = "General Litigation Chamber"
+                            st.session_state.show_delete_modal = False
+                            time.sleep(1)
+                            st.rerun()
+                with col2:
+                    if st.button("Cancel", key="cancel_delete_btn"):
+                        st.session_state.show_delete_modal = False
+                        st.rerun()
+            
+            st.divider()
+            
+            # Email Brief Button
+            if st.button("📧 Email Brief", use_container_width=True):
+                hist = db_fetch_chamber_history(st.session_state.user_email, st.session_state.active_ch)
+                if hist:
+                    with st.spinner("Sending email..."):
+                        if dispatch_legal_brief(st.session_state.user_email, st.session_state.active_ch, hist):
+                            st.success("✓ Brief sent to your email!")
+                            db_log_event(st.session_state.user_email, "EMAIL_BRIEF", f"Sent brief for {st.session_state.active_ch}")
+                        else:
+                            st.error("Failed to send email")
+                else:
+                    st.warning("No conversation to send")
 
         st.divider()
         
@@ -903,7 +950,7 @@ def render_main_interface():
             sys_lang = st.selectbox("Response Language", list(lexicon.keys()))
             
             st.caption("Response Format")
-            st.info("📋 IRAC Format Enabled:\n- Issue\n- Rule\n- Application\n- Conclusion")
+            st.info("📋 IRAC Format Enabled")
             
             st.divider()
             if st.button("🚪 Secure Logout", use_container_width=True):
@@ -913,7 +960,7 @@ def render_main_interface():
     # --- MAIN CONTENT ---
     if nav_mode == "Chambers":
         st.header(f"💼 CASE: {st.session_state.active_ch}")
-        st.caption("Strategic Litigation Environment | IRAC Format Analysis | End-to-End Encryption")
+        st.caption("Strategic Litigation Environment | IRAC Format Analysis")
         
         # History Canvas
         history_canvas = st.container()
@@ -923,18 +970,13 @@ def render_main_interface():
                 with st.chat_message(msg["role"]):
                     st.markdown(msg["content"])
         
-        # Input Area Styling
-        st.markdown("""
-            <style>
-                .stChatInputContainer { padding-right: 60px !important; }
-                .mic-container { position: fixed; bottom: 38px; right: 4.5%; z-index: 999999; }
-            </style>
-        """, unsafe_allow_html=True)
-
+        # Input Area
         input_text = st.chat_input("Enter your legal query for IRAC analysis...")
         
-        with st.container():
-            st.markdown('<div class="mic-container">', unsafe_allow_html=True)
+        # Voice input positioned next to prompt bar
+        col1, col2 = st.columns([20, 1])
+        with col2:
+            st.markdown('<div class="mic-button-container">', unsafe_allow_html=True)
             input_voice = speech_to_text(
                 language=lexicon[sys_lang], 
                 start_prompt="🎙️", 
@@ -947,7 +989,6 @@ def render_main_interface():
         active_query = input_text or input_voice
         
         if active_query:
-            # Log user query
             db_log_consultation(st.session_state.user_email, st.session_state.active_ch, "user", active_query)
             
             with history_canvas:
@@ -955,10 +996,9 @@ def render_main_interface():
                     st.markdown(active_query)
             
             with st.chat_message("assistant"):
-                with st.spinner("⚖️ Conducting Legal Analysis in IRAC Format..."):
+                with st.spinner("⚖️ Conducting Legal Analysis..."):
                     engine = get_analytical_engine()
                     if engine:
-                        # Get enhanced response with IRAC format
                         ai_response = get_enhanced_legal_response(engine, active_query, sys_persona, sys_lang)
                         st.markdown(ai_response)
                         db_log_consultation(st.session_state.user_email, st.session_state.active_ch, "assistant", ai_response)
@@ -995,37 +1035,55 @@ def render_main_interface():
                 })
             
             st.table(asset_data)
-            
-            selected_doc = st.selectbox("Select Document for Analysis", local_files)
-            if st.button("🔍 Initialize Deep Scan"):
-                st.info(f"Analyzing {selected_doc} for legal precedents...")
         else:
-            st.warning("⚠️ Vault is empty. No PDF documents found in 'data' directory.")
+            st.warning("⚠️ No PDF documents found in 'data' directory.")
 
     elif nav_mode == "System Admin":
         st.header("🛡️ System Administration Console")
         
-        st.subheader("✨ Version 37.0 Enhancements")
-        enhancements = [
-            {"Feature": "Modern Animated UI", "Status": "✓ Active", "Description": "Fade-in animations, gradient shifts"},
-            {"Feature": "IRAC Format Enforcement", "Status": "✓ Active", "Description": "Issue-Rule-Application-Conclusion"},
-            {"Feature": "Formal Response System", "Status": "✓ Active", "Description": "Greetings, farewells, thanks"},
-            {"Feature": "Legal Context Filter", "Status": "✓ Active", "Description": "Rejects non-legal queries"},
-            {"Feature": "Enhanced Typography", "Status": "✓ Active", "Description": "Crimson Pro + Space Mono"},
-            {"Feature": "Glassmorphism Design", "Status": "✓ Active", "Description": "Blur effects, transparency"}
-        ]
-        st.table(enhancements)
+        # Tabs for different admin sections
+        admin_tabs = st.tabs(["👥 Counsels", "📊 Interaction Logs", "👨‍💼 Our Team"])
         
-        st.divider()
-        st.subheader("🏗️ Architectural Board")
-        architects = [
-            {"Name": "Saim Ahmed", "Designation": "Lead Architect", "Domain": "System Logic"},
-            {"Name": "Huzaifa Khan", "Designation": "AI Lead", "Domain": "LLM Tuning"},
-            {"Name": "Mustafa Khan", "Designation": "DBA", "Domain": "SQL Security"},
-            {"Name": "Ibrahim Sohail", "Designation": "UI Lead", "Domain": "Shaders"},
-            {"Name": "Daniyal Faraz", "Designation": "QA Lead", "Domain": "Integration"}
-        ]
-        st.table(architects)
+        with admin_tabs[0]:
+            st.subheader("Registered Counsels")
+            counsels = db_get_all_counsels()
+            
+            if counsels:
+                df = pd.DataFrame(counsels)
+                st.dataframe(df, use_container_width=True, hide_index=True)
+                st.caption(f"Total Counsels: {len(counsels)}")
+            else:
+                st.info("No counsels registered yet")
+        
+        with admin_tabs[1]:
+            st.subheader("System Interaction Logs")
+            
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.caption("Recent system events and user interactions")
+            with col2:
+                log_limit = st.selectbox("Show logs:", [50, 100, 200, 500], index=1)
+            
+            logs = db_get_interaction_logs(log_limit)
+            
+            if logs:
+                df = pd.DataFrame(logs)
+                st.dataframe(df, use_container_width=True, hide_index=True)
+                st.caption(f"Showing {len(logs)} most recent logs")
+            else:
+                st.info("No interaction logs available")
+        
+        with admin_tabs[2]:
+            st.subheader("🏗️ Architectural Board")
+            architects = [
+                {"Name": "Saim Ahmed", "Designation": "Lead Architect", "Domain": "System Logic"},
+                {"Name": "Huzaifa Khan", "Designation": "AI Lead", "Domain": "LLM Tuning"},
+                {"Name": "Mustafa Khan", "Designation": "DBA", "Domain": "SQL Security"},
+                {"Name": "Ibrahim Sohail", "Designation": "UI Lead", "Domain": "Shaders"},
+                {"Name": "Daniyal Faraz", "Designation": "QA Lead", "Domain": "Integration"}
+            ]
+            df = pd.DataFrame(architects)
+            st.table(df)
 
 # ------------------------------------------------------------------------------
 # SECTION 9: AUTHENTICATION PORTAL
@@ -1033,6 +1091,18 @@ def render_main_interface():
 
 def render_sovereign_portal():
     apply_enhanced_shaders()
+    
+    # Theme toggle on login page too
+    col1, col2 = st.columns([6, 1])
+    with col2:
+        if st.session_state.theme_mode == "dark":
+            if st.button("☀️ Light"):
+                st.session_state.theme_mode = "light"
+                st.rerun()
+        else:
+            if st.button("🌙 Dark"):
+                st.session_state.theme_mode = "dark"
+                st.rerun()
     
     col_l, col_c, col_r = st.columns([1, 1.6, 1])
     
@@ -1056,7 +1126,7 @@ def render_sovereign_portal():
                     st.session_state.username = user_name
                     st.rerun()
                 else:
-                    st.error("❌ CREDENTIALS INVALID: Access to vault denied.")
+                    st.error("❌ CREDENTIALS INVALID: Access denied.")
             
             st.divider()
             render_google_sign_in()
@@ -1068,12 +1138,14 @@ def render_sovereign_portal():
             
             if st.button("Initialize Registry", use_container_width=True):
                 if db_create_vault_user(reg_e, reg_n, reg_p):
-                    st.success("✓ VAULT SYNCED: Account established successfully")
+                    st.success("✓ Account created successfully!")
+                    time.sleep(2)
+                    st.rerun()
                 else:
-                    st.error("❌ REGISTRY FAILED: Email already exists or input is invalid.")
+                    st.error("❌ Email already exists or invalid input.")
 
 # ------------------------------------------------------------------------------
-# SECTION 10: MASTER EXECUTION ENGINE
+# SECTION 10: MASTER EXECUTION
 # ------------------------------------------------------------------------------
 
 if "logged_in" not in st.session_state:
@@ -1089,5 +1161,5 @@ else:
     render_main_interface()
 
 # ==============================================================================
-# END OF ALPHA APEX LEVIATHAN UPGRADED - SYSTEM STABLE
+# END OF ALPHA APEX v38.0 - ALL FEATURES COMPLETE
 # ==============================================================================
