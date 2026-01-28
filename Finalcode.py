@@ -127,7 +127,23 @@ def apply_enhanced_shaders():
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=Space+Mono:wght@400;700&display=swap');
         
-        /* Sidebar Toggle Button (Top Left) */
+        /* CRITICAL: Show Streamlit's built-in collapse button */
+        [data-testid="collapsedControl"] {{
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        }}
+        
+        /* Style the collapse arrow button */
+        [data-testid="collapsedControl"] button {{
+            background: linear-gradient(135deg, {bg_tertiary} 0%, {bg_secondary} 100%) !important;
+            border: 1px solid {border_color} !important;
+            border-radius: 8px !important;
+            padding: 8px !important;
+            color: {text_primary} !important;
+        }}
+        
+        /* Sidebar Toggle Button (Custom) */
         .sidebar-toggle-btn {{
             position: fixed;
             top: 20px;
@@ -195,6 +211,15 @@ def apply_enhanced_shaders():
             backdrop-filter: blur(20px) !important;
             border-right: 1px solid {border_color} !important;
             box-shadow: 12px 0 40px rgba(0, 0, 0, 0.3) !important;
+        }}
+        
+        /* Ensure sidebar is collapsible */
+        [data-testid="stSidebar"][aria-expanded="false"] {{
+            transform: translateX(-100%) !important;
+        }}
+        
+        [data-testid="stSidebar"][aria-expanded="true"] {{
+            transform: translateX(0) !important;
         }}
         
         /* Chat Messages */
@@ -890,13 +915,10 @@ def render_google_sign_in():
 def render_main_interface():
     apply_enhanced_shaders()
     
-    # Add custom sidebar toggle button with JavaScript
-    st.markdown("""
+    # Sidebar toggle button - place it before columns to ensure it's always visible
+    sidebar_toggle_html = """
+    <div style="position: fixed; top: 20px; left: 20px; z-index: 999999;">
         <button onclick="toggleSidebar()" style="
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            z-index: 999999;
             background: linear-gradient(135deg, #1e293b 0%, #1a1f3a 100%);
             border: 1px solid rgba(56, 189, 248, 0.2);
             border-radius: 12px;
@@ -906,19 +928,54 @@ def render_main_interface():
             font-weight: 700;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
             font-family: 'Crimson Pro', Georgia, serif;
-        ">☰ Menu</button>
-        
-        <script>
-            function toggleSidebar() {
-                const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
-                const collapseBtn = window.parent.document.querySelector('[data-testid="collapsedControl"]');
-                
-                if (collapseBtn) {
-                    collapseBtn.click();
+            transition: all 0.3s ease;
+        " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(0, 0, 0, 0.3)';" 
+           onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(0, 0, 0, 0.2)';">
+            ☰ Menu
+        </button>
+    </div>
+    
+    <script>
+        function toggleSidebar() {
+            const parent = window.parent.document;
+            
+            // Try multiple methods to find and click the collapse button
+            let collapseBtn = parent.querySelector('[data-testid="collapsedControl"]');
+            
+            if (!collapseBtn) {
+                // Try alternative selectors
+                collapseBtn = parent.querySelector('button[kind="header"]');
+            }
+            
+            if (!collapseBtn) {
+                // Look for any button in the sidebar area
+                const sidebar = parent.querySelector('[data-testid="stSidebar"]');
+                if (sidebar) {
+                    const buttons = sidebar.querySelectorAll('button');
+                    collapseBtn = buttons[0];
                 }
             }
-        </script>
-    """, unsafe_allow_html=True)
+            
+            if (collapseBtn) {
+                collapseBtn.click();
+                console.log('Sidebar toggle clicked');
+            } else {
+                console.log('Could not find collapse button');
+                // Fallback: try to toggle aria-expanded attribute directly
+                const sidebar = parent.querySelector('[data-testid="stSidebar"]');
+                if (sidebar) {
+                    const currentState = sidebar.getAttribute('aria-expanded');
+                    sidebar.setAttribute('aria-expanded', currentState === 'true' ? 'false' : 'true');
+                }
+            }
+        }
+        
+        // Debug: log when script loads
+        console.log('Sidebar toggle script loaded');
+    </script>
+    """
+    
+    components.html(sidebar_toggle_html, height=0)
     
     # Top bar with theme toggle
     col1, col2, col3 = st.columns([1, 6, 1])
