@@ -30,6 +30,10 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 
+if "theme_modfe" not in st.session_state:
+    st.session_state.theme_modfe = "dark"
+
+
 # ------------------------------------------------------------------------------
 # SECTION 2: GLOBAL CONFIGURATION
 # ------------------------------------------------------------------------------
