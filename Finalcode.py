@@ -61,7 +61,7 @@ SYSTEM_CONFIG = {
     "LOG_LEVEL": "STRICT",
     "SMTP_SERVER": "smtp.gmail.com",
     "SMTP_PORT": 587,
-    "CORE_MODEL": "gemini-2.0-flash",
+    "CORE_MODEL": "gemini-2.5-flash",
     "MAX_HISTORY": 50
 }
 
@@ -725,7 +725,7 @@ def get_analytical_engine():
         return ChatGoogleGenerativeAI(
             model=SYSTEM_CONFIG["CORE_MODEL"], 
             google_api_key=api_key, 
-            temperature=0.1  # Low temperature for high factual accuracy
+            temperature=0.2  # Low temperature for high factual accuracy
         )
     except Exception as e:
         st.error(f"AI ENGINE INITIALIZATION ERROR: {e}")
