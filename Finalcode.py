@@ -3,6 +3,7 @@
 # ==============================================================================
 # SYSTEM VERSION: 38.1 (UPGRADED)
 # NEW FEATURES: Sidebar Toggle Button + Mic Button at Prompt Bar
+# FIXES: Light/Dark mode working + Functional menu button
 # ==============================================================================
 
 try:
@@ -30,8 +31,9 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 
-if "theme_modfe" not in st.session_state:
-    st.session_state.theme_modfe = "dark"
+# FIXED: Corrected variable name from theme_modfe to theme_mode
+if "theme_mode" not in st.session_state:
+    st.session_state.theme_mode = "dark"
 
 
 # ------------------------------------------------------------------------------
@@ -71,8 +73,9 @@ if "sidebar_visible" not in st.session_state:
 def apply_enhanced_shaders():
     """Enhanced CSS with light/dark mode support and sidebar toggle"""
     
+    # FIXED: Use correct session state variable
     # Define color schemes
-    if st.session_state.theme_modfe == "dark":
+    if st.session_state.theme_mode == "dark":
         bg_primary = "#0b1120"
         bg_secondary = "#1a1f3a"
         bg_tertiary = "#1e293b"
@@ -95,30 +98,52 @@ def apply_enhanced_shaders():
         chat_bg = "rgba(241, 245, 249, 0.6)"
         prompt_area_bg = "#ffffff"
     
-    # Add JavaScript for sidebar control
-    # Add JavaScript for sidebar control
-    sidebar_script = """
+    # FIXED: Improved JavaScript for sidebar control with proper event handling
+    sidebar_script = f"""
     <script>
-    let sidebarOpen = true;
-
-    function toggleSidebar() {
-        const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
-        const main = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
-
-        if (!sidebar) return;
-
-        if (sidebarOpen) {
-            sidebar.style.transform = "translateX(-105%)";
-            sidebar.style.transition = "transform 0.3s ease";
-            if (main) main.style.marginLeft = "0px";
-            sidebarOpen = false;
-        } else {
-            sidebar.style.transform = "translateX(0px)";
-            sidebar.style.transition = "transform 0.3s ease";
-            if (main) main.style.marginLeft = "300px";
-            sidebarOpen = true;
-        }
-    }
+    // Wait for page to fully load
+    window.addEventListener('load', function() {{
+        // Initialize sidebar state
+        if (typeof window.sidebarOpen === 'undefined') {{
+            window.sidebarOpen = true;
+        }}
+        
+        // Function to toggle sidebar
+        window.toggleSidebar = function() {{
+            const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
+            const main = window.parent.document.querySelector('.main');
+            const collapseControl = window.parent.document.querySelector('[data-testid="collapsedControl"]');
+            
+            if (!sidebar) {{
+                console.log('Sidebar element not found');
+                return;
+            }}
+            
+            if (window.sidebarOpen) {{
+                // Hide sidebar
+                sidebar.style.marginLeft = '-21rem';
+                sidebar.style.transition = 'margin-left 0.3s ease';
+                if (main) {{
+                    main.style.marginLeft = '0';
+                }}
+                window.sidebarOpen = false;
+            }} else {{
+                // Show sidebar
+                sidebar.style.marginLeft = '0';
+                sidebar.style.transition = 'margin-left 0.3s ease';
+                if (main) {{
+                    main.style.marginLeft = '';
+                }}
+                window.sidebarOpen = true;
+            }}
+        }};
+        
+        // Add event listener to menu button
+        const menuBtn = window.parent.document.querySelector('.menu-toggle-btn');
+        if (menuBtn) {{
+            menuBtn.addEventListener('click', window.toggleSidebar);
+        }}
+    }});
     </script>
     """
     components.html(sidebar_script, height=0)
@@ -128,7 +153,7 @@ def apply_enhanced_shaders():
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=Space+Mono:wght@400;700&display=swap');
         
-        /* Menu Button Styling */
+        /* Menu Button Styling - FIXED: Added pointer-events */
         .menu-toggle-btn {{
             position: fixed !important;
             top: 20px !important;
@@ -143,6 +168,7 @@ def apply_enhanced_shaders():
             font-weight: 700 !important;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
             transition: all 0.3s ease !important;
+            pointer-events: auto !important;
         }}
         
         .menu-toggle-btn:hover {{
@@ -887,8 +913,10 @@ def render_google_sign_in():
 
 def render_main_interface():
     apply_enhanced_shaders()
+    
+    # FIXED: Menu button with onclick handler
     st.markdown("""
-<div class="menu-toggle-btn" onclick="toggleSidebar()">
+<div class="menu-toggle-btn" onclick="window.toggleSidebar()">
 ☰ Menu
 </div>
 """, unsafe_allow_html=True)
@@ -1232,5 +1260,5 @@ else:
     render_main_interface()
 
 # ==============================================================================
-# END OF ALPHA APEX v38.1 - UPGRADED VERSION
+# END OF ALPHA APEX v38.1 - FIXED VERSION
 # ==============================================================================
