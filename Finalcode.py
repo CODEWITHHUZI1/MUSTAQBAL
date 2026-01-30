@@ -602,9 +602,9 @@ def db_get_interaction_logs(limit=100):
 def get_ai_engine():
     try:
         return ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
+            model="gemini-2.5-flash",
             google_api_key=st.secrets["GOOGLE_API_KEY"],
-            temperature=0.0
+            temperature=0.1
         )
     except:
         return None
