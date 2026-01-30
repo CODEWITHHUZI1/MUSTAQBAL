@@ -1,12 +1,8 @@
 # ==============================================================================
 # ALPHA APEX - LEVIATHAN ENTERPRISE LEGAL INTELLIGENCE SYSTEM - v38.1
 # ==============================================================================
-# SYSTEM VERSION: 38.1 (FULLY FIXED)
-# NEW FEATURES: Mic Button at Prompt Bar
-# FIXES APPLIED: 
-#   1. Light/Dark mode now fully functional (fixed theme_mode variable)
-#   2. Native Streamlit sidebar (removed non-functional JavaScript toggle)
-#   3. All other features preserved exactly as requested
+# SYSTEM VERSION: 38.1 (FINAL WORKING VERSION)
+# FEATURES: Working Collapsible Sidebar + Light/Dark Mode + Mic Button
 # ==============================================================================
 
 try:
@@ -34,10 +30,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 
-# FIXED: Corrected variable name from theme_modfe to theme_mode
 if "theme_mode" not in st.session_state:
     st.session_state.theme_mode = "dark"
-
 
 # ------------------------------------------------------------------------------
 # SECTION 2: GLOBAL CONFIGURATION
@@ -50,7 +44,7 @@ SYSTEM_CONFIG = {
     "THEME_PRIMARY": "#0b1120",
     "DB_FILENAME": "advocate_ai_v2.db",
     "DATA_REPOSITORY": "data",
-    "VERSION_ID": "38.1.0-UPGRADED",
+    "VERSION_ID": "38.1.0-FINAL",
     "LOG_LEVEL": "STRICT",
     "SMTP_SERVER": "smtp.gmail.com",
     "SMTP_PORT": 587
@@ -60,22 +54,22 @@ st.set_page_config(
     page_title=SYSTEM_CONFIG["APP_NAME"], 
     page_icon=SYSTEM_CONFIG["APP_ICON"], 
     layout=SYSTEM_CONFIG["LAYOUT"],
-    initial_sidebar_state="expanded"  # Match working version
+    initial_sidebar_state="collapsed"  # Start collapsed, we'll handle it manually
 )
 
-# Initialize theme in session state
+# Initialize session states
 if "theme_mode" not in st.session_state:
     st.session_state.theme_mode = "dark"
+if "sidebar_open" not in st.session_state:
+    st.session_state.sidebar_open = True
 
 # ------------------------------------------------------------------------------
-# SECTION 3: ENHANCED SHADER WITH LIGHT/DARK MODE + SIDEBAR TOGGLE
+# SECTION 3: ENHANCED SHADER WITH LIGHT/DARK MODE
 # ------------------------------------------------------------------------------
 
 def apply_enhanced_shaders():
     """Enhanced CSS with light/dark mode support"""
     
-    # FIXED: Use correct session state variable
-    # Define color schemes
     if st.session_state.theme_mode == "dark":
         bg_primary = "#0b1120"
         bg_secondary = "#1a1f3a"
@@ -84,7 +78,7 @@ def apply_enhanced_shaders():
         text_secondary = "#b4bdd0"
         border_color = "rgba(56, 189, 248, 0.2)"
         input_bg = "rgba(30, 41, 59, 0.6)"
-        sidebar_bg = "rgba(2, 6, 23, 0.8)"
+        sidebar_bg = "rgba(2, 6, 23, 0.95)"
         chat_bg = "rgba(30, 41, 59, 0.4)"
         prompt_area_bg = "#0a0f1a"
     else:
@@ -95,13 +89,69 @@ def apply_enhanced_shaders():
         text_secondary = "#475569"
         border_color = "rgba(14, 165, 233, 0.3)"
         input_bg = "rgba(255, 255, 255, 0.9)"
-        sidebar_bg = "rgba(241, 245, 249, 0.9)"
+        sidebar_bg = "rgba(241, 245, 249, 0.95)"
         chat_bg = "rgba(241, 245, 249, 0.6)"
         prompt_area_bg = "#ffffff"
-
+    
     shader_css = f"""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=Space+Mono:wght@400;700&display=swap');
+        
+        /* Hamburger Menu Button */
+        .hamburger-btn {{
+            position: fixed !important;
+            top: 20px !important;
+            left: 20px !important;
+            z-index: 999999 !important;
+            background: linear-gradient(135deg, {bg_tertiary} 0%, {bg_secondary} 100%) !important;
+            border: 1px solid {border_color} !important;
+            border-radius: 12px !important;
+            padding: 12px 16px !important;
+            cursor: pointer !important;
+            color: {text_primary} !important;
+            font-size: 24px !important;
+            font-weight: 700 !important;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
+            transition: all 0.3s ease !important;
+            line-height: 1 !important;
+        }}
+        
+        .hamburger-btn:hover {{
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3) !important;
+            border-color: #38bdf8 !important;
+        }}
+        
+        /* Custom Sidebar Container */
+        .custom-sidebar {{
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100vh;
+            width: 320px;
+            background: {sidebar_bg} !important;
+            backdrop-filter: blur(20px) !important;
+            border-right: 1px solid {border_color} !important;
+            box-shadow: 12px 0 40px rgba(0, 0, 0, 0.3) !important;
+            padding: 20px;
+            overflow-y: auto;
+            z-index: 999998;
+            transition: transform 0.3s ease;
+        }}
+        
+        .custom-sidebar.hidden {{
+            transform: translateX(-100%);
+        }}
+        
+        /* Main content adjustment */
+        .main-content {{
+            margin-left: 340px;
+            transition: margin-left 0.3s ease;
+        }}
+        
+        .main-content.expanded {{
+            margin-left: 20px;
+        }}
         
         /* Global Styles */
         * {{ 
@@ -115,14 +165,6 @@ def apply_enhanced_shaders():
             background: linear-gradient(135deg, {bg_primary} 0%, {bg_secondary} 50%, {bg_primary} 100%) !important;
             background-size: 200% 200% !important;
             color: {text_primary} !important; 
-        }}
-        
-        /* Sidebar */
-        [data-testid="stSidebar"] {{
-            background: {sidebar_bg} !important; 
-            backdrop-filter: blur(20px) !important;
-            border-right: 1px solid {border_color} !important;
-            box-shadow: 12px 0 40px rgba(0, 0, 0, 0.3) !important;
         }}
         
         /* Chat Messages */
@@ -207,10 +249,9 @@ def apply_enhanced_shaders():
             backdrop-filter: blur(10px) !important;
             border-top: 1px solid {border_color} !important;
             padding: 20px !important;
-            position: relative !important;
         }}
         
-        /* Chat Input Field - with space for mic button */
+        /* Chat Input Field */
         .stChatInput>div>div>textarea {{
             background: {input_bg} !important;
             color: {text_primary} !important;
@@ -221,7 +262,7 @@ def apply_enhanced_shaders():
             font-size: 15px !important;
         }}
         
-        /* Microphone Button - INSIDE PROMPT BAR */
+        /* Microphone Button */
         .mic-in-prompt {{
             position: absolute !important;
             right: 30px !important;
@@ -235,26 +276,8 @@ def apply_enhanced_shaders():
             border-radius: 50% !important;
             width: 40px !important;
             height: 40px !important;
-            min-width: 40px !important;
-            min-height: 40px !important;
             padding: 0 !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
             box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4) !important;
-            cursor: pointer !important;
-            transition: all 0.2s ease !important;
-        }}
-        
-        .mic-in-prompt button:hover {{
-            transform: scale(1.1) !important;
-            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.6) !important;
-        }}
-        
-        .mic-in-prompt button svg {{
-            width: 20px !important;
-            height: 20px !important;
-            fill: white !important;
         }}
         
         /* Radio Buttons */
@@ -269,10 +292,6 @@ def apply_enhanced_shaders():
         }}
         
         /* Tables */
-        .stTable {{
-            color: {text_primary} !important;
-        }}
-        
         table {{
             color: {text_primary} !important;
         }}
@@ -298,6 +317,11 @@ def apply_enhanced_shaders():
         ::-webkit-scrollbar-thumb {{ 
             background: {bg_tertiary}; 
             border-radius: 6px; 
+        }}
+        
+        /* Hide default sidebar */
+        [data-testid="stSidebar"] {{
+            display: none !important;
         }}
         
         /* Hide Streamlit branding */
@@ -557,7 +581,6 @@ def db_fetch_chamber_history(email, chamber_name):
     return history
 
 def db_create_new_chamber(email, chamber_name):
-    """Create a new case/chamber"""
     conn = get_db_connection()
     if not conn:
         return False
@@ -583,7 +606,6 @@ def db_create_new_chamber(email, chamber_name):
         conn.close()
 
 def db_delete_chamber(email, chamber_name):
-    """Delete a chamber and all its messages"""
     conn = get_db_connection()
     if not conn:
         return False
@@ -608,7 +630,6 @@ def db_delete_chamber(email, chamber_name):
         conn.close()
 
 def db_get_all_counsels():
-    """Get all registered counsels"""
     conn = get_db_connection()
     counsels = []
     
@@ -639,7 +660,6 @@ def db_get_all_counsels():
     return counsels
 
 def db_get_interaction_logs(limit=100):
-    """Get recent interaction logs"""
     conn = get_db_connection()
     logs = []
     
@@ -688,8 +708,6 @@ def get_analytical_engine():
         return None
 
 def get_enhanced_legal_response(engine, user_query, sys_persona, sys_lang):
-    """Generate AI response with IRAC format"""
-    
     if is_greeting(user_query):
         return get_formal_greeting()
     
@@ -738,7 +756,6 @@ Provide your analysis now:
         return f"Error generating legal analysis: {str(e)}"
 
 def dispatch_legal_brief(target_email, chamber_name, history_data):
-    """Send full conversation via email"""
     try:
         sender_user = st.secrets["EMAIL_USER"]
         sender_pass = st.secrets["EMAIL_PASS"].replace(" ", "")
@@ -812,24 +829,143 @@ def render_google_sign_in():
         st.rerun()
 
 # ------------------------------------------------------------------------------
+# SECTION 8: SIDEBAR COMPONENT
+# ------------------------------------------------------------------------------
+
+def render_custom_sidebar(lexicon):
+    """Render custom collapsible sidebar"""
+    
+    sidebar_class = "" if st.session_state.sidebar_open else "hidden"
+    
+    # Create sidebar HTML
+    sidebar_html = f"""
+    <div class="custom-sidebar {sidebar_class}" id="customSidebar">
+    """
+    
+    st.markdown(sidebar_html, unsafe_allow_html=True)
+    
+    # Sidebar content using Streamlit components
+    if st.session_state.sidebar_open:
+        with st.container():
+            st.markdown("<div class='logo-text'>⚖️ ALPHA APEX</div>", unsafe_allow_html=True)
+            st.markdown("<div class='sub-logo-text'>Leviathan Suite v38.1</div>", unsafe_allow_html=True)
+            
+            st.markdown("**Sovereign Navigation Hub**")
+            nav_mode = st.radio(
+                "Navigation", 
+                ["Chambers", "Law Library", "System Admin"], 
+                label_visibility="collapsed",
+                key="nav_radio"
+            )
+            
+            st.divider()
+            
+            if nav_mode == "Chambers":
+                st.markdown("**Active Case Files**")
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT chamber_name FROM chambers WHERE owner_email=?", (st.session_state.user_email,))
+                user_chambers = [r[0] for r in cursor.fetchall()]
+                conn.close()
+                
+                if not user_chambers:
+                    user_chambers = ["General Litigation Chamber"]
+                    
+                st.session_state.active_ch = st.radio(
+                    "Select Case", 
+                    user_chambers, 
+                    label_visibility="collapsed",
+                    key="chamber_radio"
+                )
+                
+                col_add, col_del = st.columns(2)
+                with col_add:
+                    if st.button("➕ New Case", key="new_case_btn"):
+                        st.session_state.show_new_case_modal = True
+                with col_del:
+                    if st.button("🗑️ Delete", key="del_case_btn"):
+                        if st.session_state.active_ch != "General Litigation Chamber":
+                            st.session_state.show_delete_modal = True
+                        else:
+                            st.warning("Cannot delete default chamber")
+                
+                if st.session_state.get('show_new_case_modal', False):
+                    new_case_name = st.text_input("Enter New Case Name:", key="new_case_input")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("Create", key="create_confirm"):
+                            if new_case_name:
+                                if db_create_new_chamber(st.session_state.user_email, new_case_name):
+                                    st.success(f"✓ Created: {new_case_name}")
+                                    st.session_state.show_new_case_modal = False
+                                    st.session_state.active_ch = new_case_name
+                                    time.sleep(1)
+                                    st.rerun()
+                                else:
+                                    st.error("Case already exists")
+                    with col2:
+                        if st.button("Cancel", key="create_cancel"):
+                            st.session_state.show_new_case_modal = False
+                            st.rerun()
+                
+                if st.session_state.get('show_delete_modal', False):
+                    st.warning(f"⚠️ Delete '{st.session_state.active_ch}'?")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("Yes", key="delete_confirm"):
+                            if db_delete_chamber(st.session_state.user_email, st.session_state.active_ch):
+                                st.success("✓ Deleted")
+                                st.session_state.active_ch = "General Litigation Chamber"
+                                st.session_state.show_delete_modal = False
+                                time.sleep(1)
+                                st.rerun()
+                    with col2:
+                        if st.button("No", key="delete_cancel"):
+                            st.session_state.show_delete_modal = False
+                            st.rerun()
+                
+                st.divider()
+                
+                if st.button("📧 Email Brief", use_container_width=True, key="email_brief_btn"):
+                    hist = db_fetch_chamber_history(st.session_state.user_email, st.session_state.active_ch)
+                    if hist:
+                        with st.spinner("Sending..."):
+                            if dispatch_legal_brief(st.session_state.user_email, st.session_state.active_ch, hist):
+                                st.success("✓ Brief sent!")
+                                db_log_event(st.session_state.user_email, "EMAIL_BRIEF", f"Sent: {st.session_state.active_ch}")
+                    else:
+                        st.warning("No conversation to send")
+            
+            st.divider()
+            
+            with st.expander("⚙️ Advanced Settings"):
+                st.caption("AI Configuration")
+                sys_persona = st.text_input("Assistant Persona", value="Senior High Court Advocate", key="persona_input")
+                sys_lang = st.selectbox("Response Language", list(lexicon.keys()), key="lang_select")
+                
+                st.caption("Response Format")
+                st.info("📋 IRAC Format Enabled")
+                
+                st.divider()
+                if st.button("🚪 Secure Logout", use_container_width=True, key="logout_btn"):
+                    st.session_state.logged_in = False
+                    st.rerun()
+            
+            return nav_mode, sys_persona, sys_lang
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    if not st.session_state.sidebar_open:
+        return st.session_state.get('nav_mode', 'Chambers'), st.session_state.get('sys_persona', 'Senior High Court Advocate'), st.session_state.get('sys_lang', 'English')
+    
+    return 'Chambers', 'Senior High Court Advocate', 'English'
+
+# ------------------------------------------------------------------------------
 # SECTION 9: MAIN INTERFACE
 # ------------------------------------------------------------------------------
 
 def render_main_interface():
     apply_enhanced_shaders()
-    
-    # Top bar with theme toggle only
-    col1, col2, col3 = st.columns([1, 5, 1])
-    
-    with col3:
-        if st.session_state.theme_mode == "dark":
-            if st.button("☀️ Light", key="theme_toggle"):
-                st.session_state.theme_mode = "light"
-                st.rerun()
-        else:
-            if st.button("🌙 Dark", key="theme_toggle"):
-                st.session_state.theme_mode = "dark"
-                st.rerun()
     
     lexicon = {
         "English": "en-US", 
@@ -837,123 +973,47 @@ def render_main_interface():
         "Sindhi": "sd-PK", 
         "Punjabi": "pa-PK"
     }
-
-    # --- SIDEBAR (ALWAYS VISIBLE) ---
-    with st.sidebar:
-        st.markdown("<div class='logo-text'>⚖️ ALPHA APEX</div>", unsafe_allow_html=True)
-        st.markdown("<div class='sub-logo-text'>Leviathan Suite v38.1</div>", unsafe_allow_html=True)
-        
-        st.markdown("**Sovereign Navigation Hub**")
-        nav_mode = st.radio(
-            "Navigation", 
-            ["Chambers", "Law Library", "System Admin"], 
-            label_visibility="collapsed"
-        )
-        
-        st.divider()
-        
-        if nav_mode == "Chambers":
-            st.markdown("**Active Case Files**")
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT chamber_name FROM chambers WHERE owner_email=?", (st.session_state.user_email,))
-            user_chambers = [r[0] for r in cursor.fetchall()]
-            conn.close()
-            
-            if not user_chambers:
-                user_chambers = ["General Litigation Chamber"]
-                
-            st.session_state.active_ch = st.radio(
-                "Select Case", 
-                user_chambers, 
-                label_visibility="collapsed"
-            )
-            
-            # Action Buttons
-            col_add, col_del = st.columns(2)
-            with col_add:
-                if st.button("➕ New Case"):
-                    st.session_state.show_new_case_modal = True
-            with col_del:
-                if st.button("🗑️ Delete Case"):
-                    if st.session_state.active_ch != "General Litigation Chamber":
-                        st.session_state.show_delete_modal = True
-                    else:
-                        st.warning("Cannot delete default chamber")
-            
-            # New Case Modal
-            if st.session_state.get('show_new_case_modal', False):
-                new_case_name = st.text_input("Enter New Case Name:", key="new_case_input")
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("Create", key="create_case_btn"):
-                        if new_case_name:
-                            if db_create_new_chamber(st.session_state.user_email, new_case_name):
-                                st.success(f"✓ Created: {new_case_name}")
-                                st.session_state.show_new_case_modal = False
-                                st.session_state.active_ch = new_case_name
-                                time.sleep(1)
-                                st.rerun()
-                            else:
-                                st.error("Case already exists or error occurred")
-                with col2:
-                    if st.button("Cancel", key="cancel_case_btn"):
-                        st.session_state.show_new_case_modal = False
-                        st.rerun()
-            
-            # Delete Case Modal
-            if st.session_state.get('show_delete_modal', False):
-                st.warning(f"⚠️ Delete '{st.session_state.active_ch}'?")
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("Yes, Delete", key="confirm_delete_btn"):
-                        if db_delete_chamber(st.session_state.user_email, st.session_state.active_ch):
-                            st.success("✓ Case Deleted")
-                            st.session_state.active_ch = "General Litigation Chamber"
-                            st.session_state.show_delete_modal = False
-                            time.sleep(1)
-                            st.rerun()
-                with col2:
-                    if st.button("Cancel", key="cancel_delete_btn"):
-                        st.session_state.show_delete_modal = False
-                        st.rerun()
-            
-            st.divider()
-            
-            # Email Brief Button
-            if st.button("📧 Email Brief", use_container_width=True):
-                hist = db_fetch_chamber_history(st.session_state.user_email, st.session_state.active_ch)
-                if hist:
-                    with st.spinner("Sending email..."):
-                        if dispatch_legal_brief(st.session_state.user_email, st.session_state.active_ch, hist):
-                            st.success("✓ Brief sent to your email!")
-                            db_log_event(st.session_state.user_email, "EMAIL_BRIEF", f"Sent brief for {st.session_state.active_ch}")
-                        else:
-                            st.error("Failed to send email")
-                else:
-                    st.warning("No conversation to send")
-
-        st.divider()
-        
-        with st.expander("⚙️ Advanced Settings"):
-            st.caption("AI Configuration")
-            sys_persona = st.text_input("Assistant Persona", value="Senior High Court Advocate")
-            sys_lang = st.selectbox("Response Language", list(lexicon.keys()))
-            
-            st.caption("Response Format")
-            st.info("📋 IRAC Format Enabled")
-            
-            st.divider()
-            if st.button("🚪 Secure Logout", use_container_width=True):
-                st.session_state.logged_in = False
+    
+    # Hamburger Menu Button
+    col_menu, col_spacer, col_theme = st.columns([1, 10, 1])
+    
+    with col_menu:
+        if st.button("☰", key="hamburger", help="Toggle Sidebar"):
+            st.session_state.sidebar_open = not st.session_state.sidebar_open
+            st.rerun()
+    
+    with col_theme:
+        if st.session_state.theme_mode == "dark":
+            if st.button("☀️", key="theme_toggle", help="Light Mode"):
+                st.session_state.theme_mode = "light"
                 st.rerun()
-
-    # --- MAIN CONTENT ---
+        else:
+            if st.button("🌙", key="theme_toggle", help="Dark Mode"):
+                st.session_state.theme_mode = "dark"
+                st.rerun()
+    
+    # Render Sidebar
+    if st.session_state.sidebar_open:
+        nav_mode, sys_persona, sys_lang = render_custom_sidebar(lexicon)
+        # Store in session state
+        st.session_state.nav_mode = nav_mode
+        st.session_state.sys_persona = sys_persona
+        st.session_state.sys_lang = sys_lang
+    else:
+        nav_mode = st.session_state.get('nav_mode', 'Chambers')
+        sys_persona = st.session_state.get('sys_persona', 'Senior High Court Advocate')
+        sys_lang = st.session_state.get('sys_lang', 'English')
+    
+    # Main content with proper margin
+    main_class = "main-content" if st.session_state.sidebar_open else "main-content expanded"
+    
+    st.markdown(f'<div class="{main_class}">', unsafe_allow_html=True)
+    
+    # MAIN CONTENT AREA
     if nav_mode == "Chambers":
         st.header(f"💼 CASE: {st.session_state.active_ch}")
         st.caption("Strategic Litigation Environment | IRAC Format Analysis")
         
-        # History Canvas
         history_canvas = st.container()
         with history_canvas:
             chat_history = db_fetch_chamber_history(st.session_state.user_email, st.session_state.active_ch)
@@ -961,10 +1021,8 @@ def render_main_interface():
                 with st.chat_message(msg["role"]):
                     st.markdown(msg["content"])
         
-        # Input Area with Mic Button
         input_container = st.container()
         with input_container:
-            # Create a column layout for prompt and mic
             prompt_col, mic_col = st.columns([20, 1])
             
             with prompt_col:
@@ -1036,7 +1094,6 @@ def render_main_interface():
     elif nav_mode == "System Admin":
         st.header("🛡️ System Administration Console")
         
-        # Tabs for different admin sections
         admin_tabs = st.tabs(["👥 Counsels", "📊 Interaction Logs", "👨‍💼 Our Team"])
         
         with admin_tabs[0]:
@@ -1079,6 +1136,8 @@ def render_main_interface():
             ]
             df = pd.DataFrame(architects)
             st.table(df)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
 # SECTION 10: AUTHENTICATION PORTAL
@@ -1087,7 +1146,6 @@ def render_main_interface():
 def render_sovereign_portal():
     apply_enhanced_shaders()
     
-    # Theme toggle on login page
     col1, col2 = st.columns([6, 1])
     with col2:
         if st.session_state.theme_mode == "dark":
@@ -1156,5 +1214,5 @@ else:
     render_main_interface()
 
 # ==============================================================================
-# END OF ALPHA APEX v38.1 - FIXED VERSION
+# END OF ALPHA APEX v38.1 - FINAL WORKING VERSION
 # ==============================================================================
